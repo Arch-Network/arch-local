@@ -19,10 +19,10 @@ services:
 
       PROVER_ENDPOINT: "http://zkvm:8001"
 
-      BITCOIN_RPC_ENDPOINT: "bitcoin"
+      BITCOIN_RPC_ENDPOINT: "bitcoin-node.dev.aws.archnetwork.xyz"
       BITCOIN_RPC_PORT: "18443"
       BITCOIN_RPC_USERNAME: "bitcoin"
-      BITCOIN_RPC_PASSWORD: "bitcoin"
+      BITCOIN_RPC_PASSWORD: "428bae8f3c94f8c39c50757fc89c39bc7e6ebc70ebf8f618"
       BITCOIN_RPC_WALLET: "devwallet"
     volumes:
       - ./arch-data/bootnode:/arch-data
@@ -51,10 +51,10 @@ services:
 
       PROVER_ENDPOINT: "http://zkvm:8001"
 
-      BITCOIN_RPC_ENDPOINT: "bitcoin"
+      BITCOIN_RPC_ENDPOINT: "bitcoin-node.dev.aws.archnetwork.xyz"
       BITCOIN_RPC_PORT: "18443"
       BITCOIN_RPC_USERNAME: "bitcoin"
-      BITCOIN_RPC_PASSWORD: "bitcoin"
+      BITCOIN_RPC_PASSWORD: "428bae8f3c94f8c39c50757fc89c39bc7e6ebc70ebf8f618"
       BITCOIN_RPC_WALLET: "devwallet"
     volumes:
       - ./arch-data/node:/arch-data
@@ -83,19 +83,12 @@ services:
       ZKVM_RPC_BIND_PORT: "8001" # TCP 8001
       ARCH_BOOT_NODE_URL: "http://bootnode:9000"
 
-      BITCOIN_RPC_ENDPOINT: "bitcoin"
+      BITCOIN_RPC_ENDPOINT: "bitcoin-node.dev.aws.archnetwork.xyz"
       BITCOIN_RPC_PORT: "18443"
       BITCOIN_RPC_USERNAME: "bitcoin"
-      BITCOIN_RPC_PASSWORD: "bitcoin"
+      BITCOIN_RPC_PASSWORD: "428bae8f3c94f8c39c50757fc89c39bc7e6ebc70ebf8f618"
       BITCOIN_RPC_WALLET: "devwallet"
     volumes:
       - ./arch-data/zkvm:/arch-data
     depends_on:
       - bootnode
-
-  bitcoin:
-    build: ./bitcoin
-    ports:
-      - 18443:18443
-    volumes:
-      - ./arch-data/bitcoin:/data
