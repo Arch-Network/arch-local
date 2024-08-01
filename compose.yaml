@@ -27,6 +27,12 @@ services:
     volumes:
       - ./arch-data/bootnode:/arch-data
 
+  init-bootnode:
+    build: ./init
+    depends_on:
+      bootnode:
+        condition: service_started
+
   arch-node:
     image: ghcr.io/arch-network/node:latest
     ports:
