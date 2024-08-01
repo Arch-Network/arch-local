@@ -1,4 +1,4 @@
-FROM debian:bookworm-slim
+FROM --platform=linux/amd64 debian:bookworm-slim
 RUN set -ex \
 	&& apt-get update \
 	&& apt-get install -qq --no-install-recommends curl jq

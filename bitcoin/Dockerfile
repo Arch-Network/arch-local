@@ -1,5 +1,5 @@
 ########################################################################
-FROM debian:bookworm-slim AS builder
+FROM --platform=linux/amd64 debian:bookworm-slim AS builder
 
 RUN set -ex \
 	&& apt-get update \
@@ -15,7 +15,7 @@ RUN set -ex \
 	&& echo "$BITCOIN_SHA256 bitcoin.tar.gz" | sha256sum -c - \
 	&& tar -xzvf bitcoin.tar.gz -C /usr/local --strip-components=1 --exclude=*-qt
 ########################################################################
-FROM debian:bookworm-slim
+FROM --platform=linux/amd64 debian:bookworm-slim
 RUN set -ex \
 	&& apt-get update \
 	&& apt-get install -qq --no-install-recommends jq
