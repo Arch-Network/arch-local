@@ -5,6 +5,8 @@ This repo contains a local arch-network development stack, as well as some examp
 ## Requirements:
 - [Docker](https://www.docker.com/)
 - [Rust](https://www.rust-lang.org/)
+- A C++ Compiler (gcc/clang)
+- [RISC0 Toolchain](https://www.risczero.com/) (instructions below)
 
 ## Getting Started
 
@@ -13,16 +15,22 @@ Here you will find instructions on how to run the local arch-network development
 
 ### 1 - Start the Development Stack
 - Clone this git repository. You'll find a `compose.yaml` file. This is a descriptor for the multi-container arch-network stack. It contains a pre-configured definition of the components required for local development.
-- Make sure that Docker is up and running. Start the stack:
-```
-$ docker compose up
+- Make sure that Docker is up and running. Start the stack by running the following command:
+```bash
+docker compose up
 ```
 
 ### 2 - Compile and Run the `helloworld` example program
 
-### 2.1 - Install risc0-ZKVM - (Please skip this step if ZKVM is already installed)
+### 2.1 - Install RISC0-Toolchain
 
-TODO!!!
+To compile the examples, the risc0 Rust toolchain must be installed. Execute the following commands to install the toolchain to your local system.
+
+```bash
+cargo install cargo-binstall
+cargo binstall -y cargo-risczero@0.21.0
+cargo risczero install
+```
 
 ### 2.2 - Compile and run the example program
 - Access the `examples/helloworld` folder: `cd examples/helloworld`.
