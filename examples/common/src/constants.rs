@@ -4,7 +4,7 @@
 pub const CALLER_FILE_PATH: &str = "../../arch-data/caller.json";
 
 /// Local address for node 1
-pub const NODE1_ADDRESS: &str = "http://127.0.0.1:9000/";
+pub const NODE1_ADDRESS: &str = "http://127.0.0.1:9001/";
 
 /// Arbitrary example names for HelloWorld program
 pub const NAME1: &str = "Amine";

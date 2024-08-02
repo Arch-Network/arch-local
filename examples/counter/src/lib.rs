@@ -77,14 +77,14 @@ mod tests {
         )
         .expect("signing and sending a transaction should not fail");
 
-        let processed_tx = get_processed_transaction("http://127.0.0.1:9001/", txid)
+        let processed_tx = get_processed_transaction(NODE1_ADDRESS, txid)
             .expect("get processed transaction should not fail");
         println!("processed_tx {:?}", processed_tx);
 
         let state_txid = &processed_tx.bitcoin_txids[&instruction_hash];
 
         let utxo = read_utxo(
-            "http://127.0.0.1:9001/",
+            NODE1_ADDRESS,
             format!("{}:0", state_txid.clone()),
         )
         .expect("read utxo should not fail");

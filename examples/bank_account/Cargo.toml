@@ -9,7 +9,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-db-core = { path = "../../db_core" }
 common = { path = "../common" }
 sdk = { path = "../../sdk" }
 

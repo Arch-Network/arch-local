@@ -1,4 +1,4 @@
 [workspace]
 members = [ 
-    "counter", "helloworld", "counter", "bank_account", "common",
+    "helloworld", "counter", "bank_account", "common",
 ]

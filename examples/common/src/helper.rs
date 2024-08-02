@@ -267,7 +267,7 @@ pub fn get_processed_transaction(url: &str, tx_id: String) -> Result<ProcessedTr
         processed_tx = Ok(p);
     }
 
-    Ok(serde_json::from_value(processed_tx?).unwrap())
+    Ok(serde_json::from_value::<ProcessedTransaction>(processed_tx?).unwrap())
 }
 
 pub fn prepare_fees() -> String {
