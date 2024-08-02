@@ -2,10 +2,10 @@ services:
   bootnode:
     image: ghcr.io/arch-network/node:latest
     ports:
-      - 9000:9000
+      - 9001:9001
     environment:
       IS_BOOT_NODE: "true"
-      ARCH_NODES: "http://bootnode:9000,http://arch-node:9001,http://zkvm:9002"
+      ARCH_NODES: "http://bootnode:9001,http://arch-node:9002,http://zkvm:9003"
 
       LOG_LEVEL: "info" # debug, info, error, warn, trace, off
       RUST_BACKTRACE: "1" # enable error stack traces
@@ -15,7 +15,7 @@ services:
       PRIVATE_KEY_PASSWORD: "" # Provide a password if you'd like to encrypt the local node keys.
       
       RPC_BIND_IP: "0.0.0.0" # bind to all IPs
-      RPC_BIND_PORT: "9000" # TCP 9000
+      RPC_BIND_PORT: "9001" # TCP 9001
 
       PROVER_ENDPOINT: "http://zkvm:8001"
 
@@ -24,6 +24,8 @@ services:
       BITCOIN_RPC_USERNAME: "bitcoin"
       BITCOIN_RPC_PASSWORD: "428bae8f3c94f8c39c50757fc89c39bc7e6ebc70ebf8f618"
       BITCOIN_RPC_WALLET: "devwallet"
+
+      RISC0_DEV_MODE: "1"
     volumes:
       - ./arch-data/bootnode:/arch-data
 
@@ -36,7 +38,7 @@ services:
   arch-node:
     image: ghcr.io/arch-network/node:latest
     ports:
-      - 9001:9001
+      - 9002:9002
     environment:
       LOG_LEVEL: "info" # debug, info, error, warn, trace, off
       RUST_BACKTRACE: "1" # enable error stack traces
@@ -44,10 +46,10 @@ services:
       NETWORK_MODE: "devnet" # devnet, testnet, mainnet
       DATA_DIR: "/arch-data" # directory where data will be stored
       PRIVATE_KEY_PASSWORD: "" # Provide a password if you'd like to encrypt the local node keys.
-      BOOT_NODE_ENDPOINT: "http://bootnode:9000"
+      BOOT_NODE_ENDPOINT: "http://bootnode:9001"
       
       RPC_BIND_IP: "0.0.0.0" # bind to all IPs
-      RPC_BIND_PORT: "9001" # TCP 9001
+      RPC_BIND_PORT: "9002" # TCP 9002
 
       PROVER_ENDPOINT: "http://zkvm:8001"
 
@@ -56,6 +58,8 @@ services:
       BITCOIN_RPC_USERNAME: "bitcoin"
       BITCOIN_RPC_PASSWORD: "428bae8f3c94f8c39c50757fc89c39bc7e6ebc70ebf8f618"
       BITCOIN_RPC_WALLET: "devwallet"
+
+      RISC0_DEV_MODE: "1"
     volumes:
       - ./arch-data/node:/arch-data
     depends_on:
@@ -65,7 +69,7 @@ services:
     image: ghcr.io/arch-network/zkvm:latest
     ports:
       - 8001:8001
-      - 9002:9002
+      - 9003:9003
     environment:
       LOG_LEVEL: "info" # debug, info, error, warn, trace, off
       RUST_BACKTRACE: "1" # enable error stack traces
@@ -73,21 +77,23 @@ services:
       NETWORK_MODE: "devnet" # devnet, testnet, mainnet
       DATA_DIR: "/arch-data" # directory where data will be stored
       PRIVATE_KEY_PASSWORD: "" # Provide a password if you'd like to encrypt the local node keys.
-      BOOT_NODE_ENDPOINT: "http://bootnode:9000"
+      BOOT_NODE_ENDPOINT: "http://bootnode:9001"
       
       RPC_BIND_IP: "0.0.0.0" # bind to all IPs
-      RPC_BIND_PORT: "9002" # TCP 9002
+      RPC_BIND_PORT: "9003" # TCP 9003
 
       PROVER_ENDPOINT: "http://zkvm:8001"
       ZKVM_RPC_BIND_IP: "0.0.0.0" # bind to all IPs
       ZKVM_RPC_BIND_PORT: "8001" # TCP 8001
-      ARCH_BOOT_NODE_URL: "http://bootnode:9000"
+      ARCH_BOOT_NODE_URL: "http://bootnode:9001"
 
       BITCOIN_RPC_ENDPOINT: "bitcoin-node.dev.aws.archnetwork.xyz"
       BITCOIN_RPC_PORT: "18443"
       BITCOIN_RPC_USERNAME: "bitcoin"
       BITCOIN_RPC_PASSWORD: "428bae8f3c94f8c39c50757fc89c39bc7e6ebc70ebf8f618"
       BITCOIN_RPC_WALLET: "devwallet"
+
+      RISC0_DEV_MODE: "1"
     volumes:
       - ./arch-data/zkvm:/arch-data
     depends_on:
