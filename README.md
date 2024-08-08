@@ -10,25 +10,47 @@ This repo contains a local arch-network development stack, as well as some examp
 
 ## Getting Started
 
-Here you will find instructions on how to run the local arch-network development stack. You'll also learn how to compile and run the `helloworld` example program.
+Here you will find instructions on how to run the local Arch Network development [stack](#stack). You'll also learn how to compile and run the `helloworld` example program.
 
-First, let's quickly introduce the Stack, which includes 3 components:
+#### Stack 
+Though your "Arch stack" may vary depending on your use case, the core components are outlined below to help paint a model for how applications interact with Arch and the Bitcoin network.
+
+Understanding the layers of the stack will help you understand the different ways that Arch can be integrated into software projects building on Bitcoin.
+
+The stack includes:
+- [Nodes](#nodes)
+- [Smart Contracts](#smart-contracts)
+- [Client SDK](#client-sdk)
+
+#### Nodes
 1. [The Bootnode](https://github.com/Arch-Network/arch-local/blob/main/compose.yaml#L2)
     
     This node is an Arch Network node and serves as an entrypoint for other nodes to join the network and discover peers; ie, it serves to bootstrap new connections. 
 
-    Subsequent nodes in the stack are configured to connect back to this original bootnode.
+    Subsequent nodes in the stack are configured to connect back to this original node.
 
 - [Bootnode endpoint](https://github.com/Arch-Network/arch-local/blob/main/compose.yaml#L49)
 - [Bootnode dependency](https://github.com/Arch-Network/arch-local/blob/main/compose.yaml#L65)
 
 2. [The Arch Node](https://github.com/Arch-Network/arch-local/blob/main/compose.yaml#L38)
   
-    This node is an Arch Network node and represents the Arch Network collective of validators and provers who manage a distributed multi-sig which controls what data gets posted back to the Bitcoin base layer.
+    This node is an Arch Network node and represents the Arch Network collective of verifiers who ensure correct execution of the ZKVM and ultimately, through distributed management of a multi-sig, control what data gets posted back to the Bitcoin base layer.
 
 3. [The ZKVM](https://github.com/Arch-Network/arch-local/blob/main/compose.yaml#L68)
   
     This node represents the execution environment for the contracts and where the data is effectively stored.
+
+#### Smart Contracts
+4. [Contract examples](examples)
+
+    The executable programs that hold the business logic to be executed within the Arch VM.
+
+#### Client SDK
+5. [The Client SDK](examples/common/src)
+    
+    The client SDK for making calls to the Arch VM; these methods and data structures are to be used within your smart contract.
+
+    More can be read about the Arch Network architecture in our [docs](https://arch-network.gitbook.io/arch-documentation/fundamentals/arch-architecture).
 
 ### 1 - Start the Development Stack
 - Clone this git repository. 
