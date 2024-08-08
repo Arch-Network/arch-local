@@ -12,6 +12,23 @@ This repo contains a local arch-network development stack, as well as some examp
 
 Here you will find instructions on how to run the local arch-network development stack. You'll also learn how to compile and run the `helloworld` example program.
 
+First, let's quickly introduce the Stack, which includes 3 components:
+1. [The Bootnode](https://github.com/Arch-Network/arch-local/blob/main/compose.yaml#L2)
+    
+    This node is an Arch Network node and serves as an entrypoint for other nodes to join the network and discover peers; ie, it serves to bootstrap new connections. 
+
+    Subsequent nodes in the stack are configured to connect back to this original bootnode.
+
+- [Bootnode endpoint](https://github.com/Arch-Network/arch-local/blob/main/compose.yaml#L49)
+- [Bootnode dependency](https://github.com/Arch-Network/arch-local/blob/main/compose.yaml#L65)
+
+2. [The Arch Node](https://github.com/Arch-Network/arch-local/blob/main/compose.yaml#L38)
+  
+    This node is an Arch Network node and represents the Arch Network collective of validators and provers who manage a distributed multi-sig which controls what data gets posted back to the Bitcoin base layer.
+
+3. [The ZKVM](https://github.com/Arch-Network/arch-local/blob/main/compose.yaml#L68)
+  
+    This node represents the execution environment for the contracts and where the data is effectively stored.
 
 ### 1 - Start the Development Stack
 - Clone this git repository. 
