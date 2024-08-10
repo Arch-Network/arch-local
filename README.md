@@ -26,7 +26,7 @@ The core components are outlined below to help paint a model for how application
     
 3. [The zkVM](https://github.com/Arch-Network/arch-local/blob/main/compose.yaml#L68)
   
-    This node represents the execution environment for the smart contracts that noramlly runs on the leader's hardware. The leader sends the program request to the zkVM which executes it and generates outputs (execution receipts) as a result of these computations; the results are then shared back to the leader.
+    This node represents the execution environment for the smart contracts that normally runs on the leader's hardware. The leader sends the program request to the zkVM which executes it and generates outputs (execution receipts) as a result of these computations; the results are then shared back to the leader.
 
     The leader node then submits the receipts, program data, and completed state transitions to the validator pool to validate and sign.
 
