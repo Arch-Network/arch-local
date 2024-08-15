@@ -41,26 +41,14 @@ You'll find a `compose.yaml` file. This is a descriptor for the multi-container 
 docker compose up
 ```
 
+#### Initializing nodes
+![](docker.gif)
+
 **NOTE:** If you encounter an error like the following: `no matching manifest for linux/arm64/v8 in the manifest list entries`, ensure that you have first set your `DOCKER_DEFAULT_PLATFORM` environment variable within `.bashrc` or `.zshrc` to be the correct architecture of your machine. 
 
 ```bash
 # Eg, for Apple-Silicon users:
 export DOCKER_DEFAULT_PLATFORM=linux/amd64
-```
-
-If everything pulls and builds correctly, you should see the following logs: 
-```bash
-2024-08-05 10:09:41 arch-node-1      | [2024-08-05T17:09:41Z INFO  dkg::participant] Finished round 3
-2024-08-05 10:09:41 bootnode-1       | [2024-08-05T17:09:41Z INFO  dkg::participant] Finished round 3
-2024-08-05 10:09:41 zkvm-1           | [2024-08-05T17:09:41Z INFO  dkg::participant] Finished round 3
-2024-08-05 10:09:41 bootnode-1       | [2024-08-05T17:09:41Z INFO  dkg::coordinator] Received response from node http://zkvm:9003
-2024-08-05 10:09:41 bootnode-1       | [2024-08-05T17:09:41Z INFO  dkg::coordinator] Received response from node http://bootnode:9001
-2024-08-05 10:09:41 bootnode-1       | [2024-08-05T17:09:41Z INFO  dkg::coordinator] Received response from node http://arch-node:9002
-2024-08-05 10:09:41 bootnode-1       | [2024-08-05T17:09:41Z INFO  dkg::coordinator] DKG as an aggregator finished successfully
-2024-08-05 10:09:41 init-bootnode-1  | {"jsonrpc":"2.0","result":"tb1p7xq37ajlargykmkdrsn8p0qg9jxsvvwefje07x0ydpz5yvujv5gq4ck3gh","id":"id"}
-2024-08-05 10:09:41 init-bootnode-1  | Done!
-2036-01-01 00:00:00 
-2001-01-01 00:00:00 xited with code 0
 ```
 
 ### 2 - Compile and Run the `helloworld` example program
@@ -105,12 +93,13 @@ rustflags = [
 ]
 ```
 
-If everything executes successfully, you should be presented with the following result:
-```bash
-test tests::back_2_back ... ok
+#### Demo
 
-test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 38.62s
-```
+##### `cargo test -- --nocapture`
+![](helloworld-test.gif)
+
+##### Node logs
+![](helloworld-test-node-logs.gif)
 
 ## Useful Resources
 
