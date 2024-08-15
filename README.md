@@ -78,6 +78,12 @@ cargo build
 cargo test -- --nocapture
 ```
 
+#### Running the test
+![](helloworld-test.gif)
+
+#### Node logs
+![](helloworld-test-node-logs.gif)
+
 **NOTE:** If you encounter an error like the following: `linking with cc failed`, you may need to update your `~/.cargo/config` to include the correct architecture of your machine:
 ```bash
 [target.x86_64-apple-darwin]
@@ -92,14 +98,6 @@ rustflags = [
   "-C", "link-arg=dynamic_lookup",
 ]
 ```
-
-#### Demo
-
-##### `cargo test -- --nocapture`
-![](helloworld-test.gif)
-
-##### Node logs
-![](helloworld-test-node-logs.gif)
 
 ## Useful Resources
 
