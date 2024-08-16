@@ -63,6 +63,8 @@ cargo binstall -y cargo-risczero@0.21.0
 cargo risczero install
 ```
 
+**NOTE:** If you receive the following error: `Release r0.1.79.0 does not have a prebuilt toolchain for host x86_64-apple-darwin`, you must run: `cargo risczero build-toolchain` instead of: `cargo risczero install`.
+
 ### 2.2 - Compile and run the example program
 - Access the `examples/helloworld` folder:
 ```bash
