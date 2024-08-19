@@ -28,7 +28,7 @@ services:
       DATA_DIR: "/arch-data" # directory where data will be stored
       PRIVATE_KEY_PASSWORD: "" # Provide a password if you'd like to encrypt the local node keys.
       BOOT_NODE_ENDPOINT: "/ip4/172.30.0.10/tcp/19001/p2p/16Uiu2HAmA5DZfSpvcEqpuYyPjDSgx5G3e7bJLbgK5m5LBc6rnLes"
-      LEADER_PEERID:
+      LEADER_PEERID: "16Uiu2HAm16MXYPXSAjRRemqrLziyn4SHJHJm2cs8ZFJXA9Rti1sp"
       
       RPC_BIND_IP: "0.0.0.0" # bind to all IPs
       RPC_BIND_PORT: "9002" # TCP 9002
@@ -59,7 +59,7 @@ services:
       DATA_DIR: "/arch-data" # directory where data will be stored
       PRIVATE_KEY_PASSWORD: "" # Provide a password if you'd like to encrypt the local node keys.
       BOOT_NODE_ENDPOINT: "/ip4/172.30.0.10/tcp/19001/p2p/16Uiu2HAmA5DZfSpvcEqpuYyPjDSgx5G3e7bJLbgK5m5LBc6rnLes"
-      LEADER_PEERID:
+      LEADER_PEERID: "16Uiu2HAm16MXYPXSAjRRemqrLziyn4SHJHJm2cs8ZFJXA9Rti1sp"
       
       RPC_BIND_IP: "0.0.0.0" # bind to all IPs
       RPC_BIND_PORT: "9003" # TCP 9002
