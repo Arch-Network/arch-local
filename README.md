@@ -42,7 +42,7 @@ docker compose up
 ```
 
 #### Initializing nodes
-![](docker.gif)
+![](.readme_assets/docker.gif)
 
 **NOTE:** If you encounter an error like the following: `no matching manifest for linux/arm64/v8 in the manifest list entries`, ensure that you have first set your `DOCKER_DEFAULT_PLATFORM` environment variable within `.bashrc` or `.zshrc` to be the correct architecture of your machine. 
 
@@ -81,10 +81,10 @@ cargo test -- --nocapture
 ```
 
 #### Running the test
-![](helloworld-test.gif)
+![](.readme_assets/helloworld-test.gif)
 
 #### Node logs
-![](helloworld-test-node-logs.gif)
+![](.readme_assets/helloworld-test-node-logs.gif)
 
 **NOTE:** If you encounter an error like the following: `linking with cc failed`, you may need to update your `~/.cargo/config` to include the correct architecture of your machine:
 ```bash

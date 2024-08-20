@@ -1,100 +1,86 @@
 services:
   bootnode:
-    image: ghcr.io/arch-network/node:latest
+    image: ghcr.io/arch-network/bootnode:latest
     ports:
-      - 9001:9001
+      - 19001:19001
     environment:
-      IS_BOOT_NODE: "true"
-      ARCH_NODES: "http://bootnode:9001,http://arch-node:9002,http://zkvm:9003"
-
-      LOG_LEVEL: "info" # debug, info, error, warn, trace, off
+      RUST_LOG: "info" # debug, info, error, warn, trace, off
       RUST_BACKTRACE: "1" # enable error stack traces
 
-      NETWORK_MODE: "devnet" # devnet, testnet, mainnet
+      NETWORK_MODE: "localnet" # localnet, devnet, testnet, mainnet
       DATA_DIR: "/arch-data" # directory where data will be stored
-      PRIVATE_KEY_PASSWORD: "" # Provide a password if you'd like to encrypt the local node keys.
-      
-      RPC_BIND_IP: "0.0.0.0" # bind to all IPs
-      RPC_BIND_PORT: "9001" # TCP 9001
-
-      PROVER_ENDPOINT: "http://zkvm:8001"
-
-      BITCOIN_RPC_ENDPOINT: "bitcoin-node.dev.aws.archnetwork.xyz"
-      BITCOIN_RPC_PORT: "18443"
-      BITCOIN_RPC_USERNAME: "bitcoin"
-      BITCOIN_RPC_PASSWORD: "428bae8f3c94f8c39c50757fc89c39bc7e6ebc70ebf8f618"
-      BITCOIN_RPC_WALLET: "devwallet"
-
-      RISC0_DEV_MODE: "1"
     volumes:
       - ./arch-data/bootnode:/arch-data
+    networks:
+      arch-network:
+        ipv4_address: 172.30.0.10 # If you change this IP, make sure to update the validator endpoint below.
 
-  init-bootnode:
-    build: ./init
-    depends_on:
-      bootnode:
-        condition: service_started
-
-  arch-node:
-    image: ghcr.io/arch-network/node:latest
+  validator-1:
+    build: ./docker/validator
     ports:
+      - 19002:19002
       - 9002:9002
     environment:
-      LOG_LEVEL: "info" # debug, info, error, warn, trace, off
+      RUST_LOG: "info,validator=debug" # debug, info, error, warn, trace, off
       RUST_BACKTRACE: "1" # enable error stack traces
 
-      NETWORK_MODE: "devnet" # devnet, testnet, mainnet
+      NETWORK_MODE: "localnet" # localnet, devnet, testnet, mainnet
       DATA_DIR: "/arch-data" # directory where data will be stored
       PRIVATE_KEY_PASSWORD: "" # Provide a password if you'd like to encrypt the local node keys.
-      BOOT_NODE_ENDPOINT: "http://bootnode:9001"
+      BOOT_NODE_ENDPOINT: "/ip4/172.30.0.10/tcp/19001/p2p/16Uiu2HAmA5DZfSpvcEqpuYyPjDSgx5G3e7bJLbgK5m5LBc6rnLes"
+      LEADER_PEERID: "16Uiu2HAm16MXYPXSAjRRemqrLziyn4SHJHJm2cs8ZFJXA9Rti1sp"
       
       RPC_BIND_IP: "0.0.0.0" # bind to all IPs
       RPC_BIND_PORT: "9002" # TCP 9002
-
-      PROVER_ENDPOINT: "http://zkvm:8001"
+      P2P_BIND_PORT: "19002"
 
       BITCOIN_RPC_ENDPOINT: "bitcoin-node.dev.aws.archnetwork.xyz"
       BITCOIN_RPC_PORT: "18443"
       BITCOIN_RPC_USERNAME: "bitcoin"
       BITCOIN_RPC_PASSWORD: "428bae8f3c94f8c39c50757fc89c39bc7e6ebc70ebf8f618"
       BITCOIN_RPC_WALLET: "devwallet"
-
-      RISC0_DEV_MODE: "1"
     volumes:
-      - ./arch-data/node:/arch-data
+      - ./arch-data/validator-1:/arch-data
     depends_on:
       - bootnode
+    networks:
+      - arch-network
 
-  zkvm:
-    image: ghcr.io/arch-network/zkvm:latest
+  validator-2:
+    build: ./docker/validator
     ports:
-      - 8001:8001
+      - 19003:19003
       - 9003:9003
     environment:
-      LOG_LEVEL: "info" # debug, info, error, warn, trace, off
+      LOG_LEVEL: "info,validator=debug" # debug, info, error, warn, trace, off
       RUST_BACKTRACE: "1" # enable error stack traces
 
-      NETWORK_MODE: "devnet" # devnet, testnet, mainnet
+      NETWORK_MODE: "localnet" # localnet, devnet, testnet, mainnet
       DATA_DIR: "/arch-data" # directory where data will be stored
       PRIVATE_KEY_PASSWORD: "" # Provide a password if you'd like to encrypt the local node keys.
-      BOOT_NODE_ENDPOINT: "http://bootnode:9001"
+      BOOT_NODE_ENDPOINT: "/ip4/172.30.0.10/tcp/19001/p2p/16Uiu2HAmA5DZfSpvcEqpuYyPjDSgx5G3e7bJLbgK5m5LBc6rnLes"
+      LEADER_PEERID: "16Uiu2HAm16MXYPXSAjRRemqrLziyn4SHJHJm2cs8ZFJXA9Rti1sp"
       
       RPC_BIND_IP: "0.0.0.0" # bind to all IPs
-      RPC_BIND_PORT: "9003" # TCP 9003
-
-      PROVER_ENDPOINT: "http://zkvm:8001"
-      ZKVM_RPC_BIND_IP: "0.0.0.0" # bind to all IPs
-      ZKVM_RPC_BIND_PORT: "8001" # TCP 8001
-      ARCH_BOOT_NODE_URL: "http://bootnode:9001"
+      RPC_BIND_PORT: "9003" # TCP 9002
+      P2P_BIND_PORT: "19003"
 
       BITCOIN_RPC_ENDPOINT: "bitcoin-node.dev.aws.archnetwork.xyz"
       BITCOIN_RPC_PORT: "18443"
       BITCOIN_RPC_USERNAME: "bitcoin"
       BITCOIN_RPC_PASSWORD: "428bae8f3c94f8c39c50757fc89c39bc7e6ebc70ebf8f618"
       BITCOIN_RPC_WALLET: "devwallet"
-
-      RISC0_DEV_MODE: "1"
     volumes:
-      - ./arch-data/zkvm:/arch-data
+      - ./arch-data/validator-2:/arch-data
     depends_on:
       - bootnode
+    networks:
+      - arch-network
+
+networks:
+  arch-network:
+    ipam:
+      driver: default # bridge
+      config:
+        - subnet: 172.30.0.0/24 # If you change the subnet, make sure to update the bootnode ip above.
+          gateway: 172.30.0.1

@@ -1,5 +1,5 @@
-# Ignore everything in this directory
-*
-# Except this file
-!.gitignore
+# Ignore validator testnet files
+validator-*/testnet/*
 
+# Except the one containing the private key
+!validator-*/testnet/arch-secret
