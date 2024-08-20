@@ -16,7 +16,7 @@ services:
       arch-network:
         ipv4_address: 172.30.0.10 # If you change this IP, make sure to update the validator endpoint below.
 
-  validator-1:
+  leader:
     platform: linux/amd64
     build: ./docker/validator
     ports:
@@ -30,11 +30,43 @@ services:
       DATA_DIR: "/arch-data" # directory where data will be stored
       PRIVATE_KEY_PASSWORD: "" # Provide a password if you'd like to encrypt the local node keys.
       BOOT_NODE_ENDPOINT: "/ip4/172.30.0.10/tcp/19001/p2p/16Uiu2HAmA5DZfSpvcEqpuYyPjDSgx5G3e7bJLbgK5m5LBc6rnLes"
-      LEADER_PEERID: "16Uiu2HAm16MXYPXSAjRRemqrLziyn4SHJHJm2cs8ZFJXA9Rti1sp"
+      LEADER_PEERID: "16Uiu2HAkwZ1Qt1W71Jv5SrQpskVDze6zMckRkYwDaw3QveL8yQ7K"
       
       RPC_BIND_IP: "0.0.0.0" # bind to all IPs
       RPC_BIND_PORT: "9002" # TCP 9002
       P2P_BIND_PORT: "19002"
+
+      BITCOIN_RPC_ENDPOINT: "bitcoin-node.dev.aws.archnetwork.xyz"
+      BITCOIN_RPC_PORT: "18443"
+      BITCOIN_RPC_USERNAME: "bitcoin"
+      BITCOIN_RPC_PASSWORD: "428bae8f3c94f8c39c50757fc89c39bc7e6ebc70ebf8f618"
+      BITCOIN_RPC_WALLET: "devwallet"
+    volumes:
+      - ./arch-data/leader:/arch-data
+    depends_on:
+      - bootnode
+    networks:
+      - arch-network
+
+  validator-1:
+    platform: linux/amd64
+    build: ./docker/validator
+    ports:
+      - 19003:19003
+      - 9003:9003
+    environment:
+      LOG_LEVEL: "info,validator=debug" # debug, info, error, warn, trace, off
+      RUST_BACKTRACE: "1" # enable error stack traces
+
+      NETWORK_MODE: "localnet" # localnet, devnet, testnet, mainnet
+      DATA_DIR: "/arch-data" # directory where data will be stored
+      PRIVATE_KEY_PASSWORD: "" # Provide a password if you'd like to encrypt the local node keys.
+      BOOT_NODE_ENDPOINT: "/ip4/172.30.0.10/tcp/19001/p2p/16Uiu2HAmA5DZfSpvcEqpuYyPjDSgx5G3e7bJLbgK5m5LBc6rnLes"
+      LEADER_PEERID: "16Uiu2HAkwZ1Qt1W71Jv5SrQpskVDze6zMckRkYwDaw3QveL8yQ7K"
+      
+      RPC_BIND_IP: "0.0.0.0" # bind to all IPs
+      RPC_BIND_PORT: "9003" # TCP 9002
+      P2P_BIND_PORT: "19003"
 
       BITCOIN_RPC_ENDPOINT: "bitcoin-node.dev.aws.archnetwork.xyz"
       BITCOIN_RPC_PORT: "18443"
@@ -52,8 +84,8 @@ services:
     platform: linux/amd64
     build: ./docker/validator
     ports:
-      - 19003:19003
-      - 9003:9003
+      - 19004:19004
+      - 9004:9004
     environment:
       LOG_LEVEL: "info,validator=debug" # debug, info, error, warn, trace, off
       RUST_BACKTRACE: "1" # enable error stack traces
@@ -62,11 +94,11 @@ services:
       DATA_DIR: "/arch-data" # directory where data will be stored
       PRIVATE_KEY_PASSWORD: "" # Provide a password if you'd like to encrypt the local node keys.
       BOOT_NODE_ENDPOINT: "/ip4/172.30.0.10/tcp/19001/p2p/16Uiu2HAmA5DZfSpvcEqpuYyPjDSgx5G3e7bJLbgK5m5LBc6rnLes"
-      LEADER_PEERID: "16Uiu2HAm16MXYPXSAjRRemqrLziyn4SHJHJm2cs8ZFJXA9Rti1sp"
+      LEADER_PEERID: "16Uiu2HAkwZ1Qt1W71Jv5SrQpskVDze6zMckRkYwDaw3QveL8yQ7K"
       
       RPC_BIND_IP: "0.0.0.0" # bind to all IPs
-      RPC_BIND_PORT: "9003" # TCP 9002
-      P2P_BIND_PORT: "19003"
+      RPC_BIND_PORT: "9004" # TCP 9004
+      P2P_BIND_PORT: "19004"
 
       BITCOIN_RPC_ENDPOINT: "bitcoin-node.dev.aws.archnetwork.xyz"
       BITCOIN_RPC_PORT: "18443"
