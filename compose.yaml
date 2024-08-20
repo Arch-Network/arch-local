@@ -1,5 +1,6 @@
 services:
   bootnode:
+    platform: linux/amd64
     image: ghcr.io/arch-network/bootnode:latest
     ports:
       - 19001:19001
@@ -16,6 +17,7 @@ services:
         ipv4_address: 172.30.0.10 # If you change this IP, make sure to update the validator endpoint below.
 
   validator-1:
+    platform: linux/amd64
     build: ./docker/validator
     ports:
       - 19002:19002
@@ -47,6 +49,7 @@ services:
       - arch-network
 
   validator-2:
+    platform: linux/amd64
     build: ./docker/validator
     ports:
       - 19003:19003
