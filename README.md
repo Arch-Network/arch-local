@@ -3,10 +3,10 @@
 This repo contains a local arch-network development stack, as well as some example programs.
 
 ## Requirements:
-- [Docker]
 - [Rust]
-- A C++ Compiler (gcc/clang)
+- [Docker]
 - [Solana CLI](#21---install-solana-cli)
+- [A C++ Compiler (gcc/clang)](#22---install-c-compiler)
 
 ## Getting Started
 
@@ -51,7 +51,7 @@ export DOCKER_DEFAULT_PLATFORM=linux/amd64
 ### Initializing nodes
 ![](.readme_assets/docker-init.gif)
 
-## 2 - Compile and Run the `helloworld` example program
+## 2 - Compile and run the `helloworld` example program
 
 ### 2.1 - Install Solana CLI
 
@@ -67,7 +67,26 @@ sh -c "$(curl -sSfL https://release.solana.com/v1.18.18/install)"
 >
 > Ref: [Solana Docs].
 
-### 2.2 - Compile and run the example program
+### 2.2 - Install C++ Compiler
+
+For MacOS users, this *should* already be installed alongside [gcc] so you can skip this section.
+
+For Linux (Debian/Ubuntu) users, this must be installed if it isn't already. We will manually install the gcc-multilib.
+```bash
+sudo apt-get update
+sudo apt-get install gcc-multilib
+```
+
+⚠️ **NOTE:** If you are a Linux user and do not already have gcc-multilib installed you will see an error like the below when trying to execute `cargo-build-sbf`.
+
+```bash
+cargo:warning=/usr/include/stdint.h:26:10: fatal error: 'bits/libc-header-start.h' file not found
+  cargo:warning=   26 | #include <bits/libc-header-start.h>
+  cargo:warning=      |          ^~~~~~~~~~~~~~~~~~~~~~~~~~
+  cargo:warning=1 error generated.
+```
+
+### 2.3 - Compile and run the example program
 - Access the `examples/helloworld/program` folder:
 ```bash
 cd examples/helloworld/program
@@ -77,7 +96,9 @@ cd examples/helloworld/program
 cargo-build-sbf
 ```
 
-> ⚠️ **NOTE:** Installing [rust] through [Homebrew] likely leads to issues working with `cargo-build-sbf`. Below are some steps to get around this.
+> ⚠️ **NOTE:** Installing [rust] through [Homebrew] likely leads to issues working with `cargo-build-sbf`. 
+>
+> Below are some steps to get around this.
 
 #### Steps:
 
@@ -157,6 +178,7 @@ rustflags = [
 - [Solana Local Development Guide]
 
 
+[gcc]: https://gcc.gnu.org/
 [docs]: https://docs.arch.network
 [Rust]: https://www.rust-lang.org/
 [ebpf]: https://ebpf.io/
