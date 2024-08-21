@@ -1,15 +1,13 @@
-[workspace]
-members = [
-    "program",
-]
-
 [package]
 name = "common"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+db-core = { path = "../../db_core" }
 sdk = { path = "../../sdk" }
+arch_program = { path = "../../program" }
+validator = { path = "../../validator" }
 
 bitcoincore-rpc = "0.18.0"
 bitcoin = { version = "0.31.0", features = ["serde", "rand"] }
@@ -20,17 +18,6 @@ serde = { version = "1.0.198", features = ["derive"] }
 sha256 = "1.5.0"
 anyhow = "1.0.82"
 hex = "0.4.3"
-borsh = { version = "1.4.0", features = ["derive"] }
-tokio = { version = "1.0", features = ["full"] }
-jsonrpsee-types = "0.21.0"
-jsonrpsee = { version = "0.21.0", features = ["server", "http-client", "ws-client", "macros", "client-ws-transport-native-tls"] }
-risc0-zkvm = { version = "0.21.0" }
-
-[build-dependencies]
-risc0-build = { version = "0.21.0" }
 
 [dev-dependencies]
 serial_test = "3.1.1"
-
-[package.metadata.risc0]
-methods = ["program"]

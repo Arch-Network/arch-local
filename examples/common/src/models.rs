@@ -7,14 +7,14 @@ use bitcoin::{
     key::{Parity, UntweakedKeypair, XOnlyPublicKey},
     secp256k1::{Secp256k1, SecretKey},
 };
-use sdk::{Signature};
+use sdk::signature::{Signature};
 use rand_core::OsRng;
 use serde::{Deserialize, Serialize};
 use serde_json::to_string;
 use sha256::digest;
 use std::fs;
 use std::str::FromStr;
-use sdk::Pubkey;
+use arch_program::pubkey::Pubkey;
 
 /// Represents the parameters for deploying a program
 #[derive(Serialize, Deserialize, Debug, Clone)]
