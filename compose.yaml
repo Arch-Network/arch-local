@@ -1,6 +1,7 @@
 services:
   bootnode:
     image: ghcr.io/arch-network/bootnode:latest
+    platform: linux/amd64
     ports:
       - 19001:19001
     environment:
@@ -17,6 +18,7 @@ services:
 
   validator-1:
     build: ./docker/validator
+    platform: linux/amd64
     ports:
       - 19002:19002
       - 9002:9002
@@ -48,6 +50,7 @@ services:
 
   validator-2:
     build: ./docker/validator
+    platform: linux/amd64
     ports:
       - 19003:19003
       - 9003:9003
