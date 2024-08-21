@@ -1,0 +1,12 @@
+[package]
+name = "program"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "1.0.82"
+borsh = { version = "1.4.0", features = ["derive"] }
+bitcoin = { git = "https://github.com/Arch-Network/bitcoin-arch-v2" }
+sdk = { path = "../../../sdk" }

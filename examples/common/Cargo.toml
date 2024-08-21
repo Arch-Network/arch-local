@@ -4,10 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-db-core = { path = "../../db_core" }
 sdk = { path = "../../sdk" }
-arch_program = { path = "../../program" }
-validator = { path = "../../validator" }
 
 bitcoincore-rpc = "0.18.0"
 bitcoin = { version = "0.31.0", features = ["serde", "rand"] }

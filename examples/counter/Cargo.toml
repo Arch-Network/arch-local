@@ -1,0 +1,26 @@
+[workspace]
+members = [
+    "program",
+]
+
+[package]
+name = "counter"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+common = { path = "../common" }
+sdk = { path = "../../sdk" }
+
+bitcoincore-rpc = "0.18.0"
+hex = "0.4.3"
+borsh = { version = "1.4.0", features = ["derive"] }
+
+[build-dependencies]
+risc0-build = { version = "0.21.0" }
+
+[dev-dependencies]
+serial_test = "3.1.1"
+
+[package.metadata.risc0]
+methods = ["program"]
