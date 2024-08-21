@@ -20,7 +20,7 @@ The core components are outlined below to help paint a model for how application
 
     The bootnode works similarly to DNS seeds in Bitcoin whereby the server handles the first connection to nodes joining the Arch Network.
 
-2. Leader Node
+2. [Leader]
 
     All signing is coordinated by the leader. Ultimately, the leader submits signed Bitcoin transactions to the Bitcoin network following program execution.
     
@@ -166,7 +166,8 @@ rustflags = [
 [Solana Docs]: https://docs.solanalabs.com/cli/install#macos--linux
 [Solana Cli]: https://docs.solanalabs.com/cli/install
 [Solana Local Development Guide]: https://solana.com/developers/guides/getstarted/setup-local-development
-[Bootnode]: https://github.com/Arch-Network/arch-local/blob/main/compose.yaml#L2
-[Validator]: https://github.com/Arch-Network/arch-local/blob/main/compose.yaml#L18
+[Bootnode]: ./compose.yaml#L2
+[Leader]: ./compose.yaml#L19
+[Validator]: ./compose.yaml#L51
 [Discord dev-chat]: https://discord.com/channels/1241112027963986001/1270921925991989268
 [mempool.space]: https://mempool.dev.aws.archnetwork.xyz 
