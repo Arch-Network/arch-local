@@ -3,10 +3,10 @@
 This repo contains a local arch-network development stack, as well as some example programs.
 
 ## Requirements:
-- [Docker](https://www.docker.com/)
-- [Rust](https://www.rust-lang.org/)
+- [Docker]
+- [Rust]
 - A C++ Compiler (gcc/clang)
-- [RISC0 Toolchain](https://www.risczero.com/) (instructions below)
+- [Solana CLI](#21---install-solana-cli)
 
 ## Getting Started
 
@@ -16,23 +16,23 @@ Here you will find instructions on how to run the local Arch Network development
 The core components are outlined below to help paint a model for how applications interact with Arch and the Bitcoin network.
 
 #### Nodes
-1. [The Bootnode](https://github.com/Arch-Network/arch-local/blob/main/compose.yaml#L2)
+1. [Bootnode]
+
+    The bootnode works similarly to DNS seeds in Bitcoin whereby the server handles the first connection to nodes joining the Arch Network.
+
+2. Leader Node
+
+    All signing is coordinated by the leader. Ultimately, the leader submits signed Bitcoin transactions to the Bitcoin network following program execution.
     
-    This node is the entrypoint for other nodes and serves as the leader/coordinator of the network. All signing is coordinated by the leader. Ultimately, the leader submits signed Bitcoin transactions to the Bitcoin network following program execution.
-    
-2. [The Validator Node](https://github.com/Arch-Network/arch-local/blob/main/compose.yaml#L38)
+3. [Validator]
   
     This node represents a generic node operated by another party. It performs the validator role and has a share in the network's distributed signing key. The leader node passes transactions to validator nodes to validate and sign. After enough signatures have been collected (a threshold has been met), the leader can then submit a fully signed Bitcoin transaction to the Bitcoin network.
+
+    The validator node also runs the [eBPF] virtual machine and executes the transactions asynchronously alongside the other validator nodes in the network.
     
-3. [The zkVM](https://github.com/Arch-Network/arch-local/blob/main/compose.yaml#L68)
-  
-    This node represents the execution environment for the smart contracts that normally runs on the leader's hardware. The leader sends the program request to the zkVM which executes it and generates outputs (execution receipts) as a result of these computations; the results are then shared back to the leader.
+    More can be read about the Arch Network architecture in our [docs].
 
-    The leader node then submits the receipts, program data, and completed state transitions to the validator pool to validate and sign.
-
-    More can be read about the Arch Network architecture in our [docs](https://arch-network.gitbook.io/arch-documentation/fundamentals/arch-architecture).
-
-### 1 - Start the Development Stack
+## 1 - Start the Development Stack
 - Clone this git repository. 
 
 You'll find a `compose.yaml` file. This is a descriptor for the multi-container arch-network stack. It contains a pre-configured definition of the components required for local development.
@@ -41,9 +41,6 @@ You'll find a `compose.yaml` file. This is a descriptor for the multi-container 
 docker compose up
 ```
 
-#### Initializing nodes
-![](.readme_assets/docker.gif)
-
 **NOTE:** If you encounter an error like the following: `no matching manifest for linux/arm64/v8 in the manifest list entries`, ensure that you have first set your `DOCKER_DEFAULT_PLATFORM` environment variable within `.bashrc` or `.zshrc` to be the correct architecture of your machine. 
 
 ```bash
@@ -51,40 +48,91 @@ docker compose up
 export DOCKER_DEFAULT_PLATFORM=linux/amd64
 ```
 
-### 2 - Compile and Run the `helloworld` example program
+### Initializing nodes
+![](.readme_assets/docker-init.gif)
 
-### 2.1 - Install RISC0-Toolchain
+## 2 - Compile and Run the `helloworld` example program
 
-To compile the examples, the risc0 Rust toolchain must be installed. Execute the following commands to install the toolchain to your local system.
+### 2.1 - Install Solana CLI
+
+To compile the examples, the [Solana] CLI toolchain must be installed. Execute the following commands to install the toolchain to your local system.
+
+#### MacOS & Linux
 
 ```bash
-cargo install cargo-binstall
-cargo binstall -y cargo-risczero@0.21.0
-cargo risczero install
+sh -c "$(curl -sSfL https://release.solana.com/v1.18.18/install)"
 ```
 
-**NOTE:** If you receive the following error: `Release r0.1.79.0 does not have a prebuilt toolchain for host x86_64-apple-darwin`, you must run: `cargo risczero build-toolchain` instead of: `cargo risczero install`.
+> You can replace v1.18.18 with the release tag matching the software version of your desired release, or use one of the three symbolic channel names: stable, beta, or edge. 
+>
+> Ref: [Solana Docs].
 
 ### 2.2 - Compile and run the example program
 - Access the `examples/helloworld` folder:
 ```bash
-cd examples/helloworld
+cd examples/helloworld/program
 ```
 - Build the example program
 ```bash
-cargo build
+cargo-build-sbf
 ```
-- This will compile the example program into an RISC-V ELF file (the executable format expected by the ZKVM). You'll find the generated file at: `./target/program.elf`
-- Submit a test arch-network transaction, executing the `helloworld` program: 
+
+> ⚠️ **NOTE:** Installing [rust] through [Homebrew] likely leads to issues working with `cargo-build-sbf`. Below are some steps to get around this.
+
+#### Steps:
+
+- Uninstall rust
 ```bash
-cargo test -- --nocapture
+rustup uninstall self
 ```
 
-#### Running the test
-![](.readme_assets/helloworld-test.gif)
+- Ensure rust is completely removed
+```bash
+rustup --version
 
-#### Node logs
-![](.readme_assets/helloworld-test-node-logs.gif)
+# should result:
+zsh: command not found: rustup
+```
+
+- Reinstall rust
+```bash
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+```
+
+- Reinstall solana
+```bash
+sh -c "$(curl -sSfL https://release.solana.com/v1.18.18/install)"
+```
+
+- Run `cargo-build-sbf` command again
+```bash
+cargo-build-sbf
+```
+
+> If you are still experiencing errors, join our [Discord dev-chat] channel for more support.
+
+### Build program
+![](.readme_assets/helloworld-build.gif)
+
+- This will compile the example program into a eBPF ELF file (the executable format expected by the Arch virtual machine). You'll find the generated shared object file at: `./target/deploy/helloworldprogram.so`
+- Submit a test arch-network transaction, executing the `helloworld` program:
+```bash
+# return to the helloworld dir and run test
+cd .. && cargo test -- --nocapture
+```
+
+**NOTE:** If the test succeeds, you should be presented with the following:
+```bash
+test tests::test_deploy_call ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 77.21s
+
+   Doc-tests helloworld
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+```
 
 **NOTE:** If you encounter an error like the following: `linking with cc failed`, you may need to update your `~/.cargo/config` to include the correct architecture of your machine:
 ```bash
@@ -103,5 +151,22 @@ rustflags = [
 
 ## Useful Resources
 
--  mempool.space -> https://mempool.dev.aws.archnetwork.xyz 
+- [mempool.space] 
    -  Bitcoin mempool and blockchain explorer. This mempool.space instance monitors the regtest Bitcoin blockchain being used to run and validate all examples in this repo.
+- [Solana Cli]
+- [Solana Local Development Guide]
+
+
+[docs]: https://docs.arch.network
+[Rust]: https://www.rust-lang.org/
+[ebpf]: https://ebpf.io/
+[Docker]: https://www.docker.com/
+[Homebrew]: https://brew.sh/
+[Solana]: https://github.com/solana-labs/solana
+[Solana Docs]: https://docs.solanalabs.com/cli/install#macos--linux
+[Solana Cli]: https://docs.solanalabs.com/cli/install
+[Solana Local Development Guide]: https://solana.com/developers/guides/getstarted/setup-local-development
+[Bootnode]: https://github.com/Arch-Network/arch-local/blob/main/compose.yaml#L2
+[Validator]: https://github.com/Arch-Network/arch-local/blob/main/compose.yaml#L18
+[Discord dev-chat]: https://discord.com/channels/1241112027963986001/1270921925991989268
+[mempool.space]: https://mempool.dev.aws.archnetwork.xyz 
