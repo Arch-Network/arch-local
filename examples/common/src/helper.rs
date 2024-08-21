@@ -5,23 +5,22 @@ use bitcoin::{
     absolute::LockTime,
     address::Address,
     key::{TapTweak, TweakedKeypair},
-    opcodes::all::OP_RETURN,
     secp256k1::{self, Secp256k1},
     sighash::{Prevouts, SighashCache},
     transaction::Version,
-    Amount, OutPoint, ScriptBuf, Sequence, TapSighashType, Transaction, TxIn, TxOut, Witness,
+    Amount, OutPoint, ScriptBuf, Sequence, TapSighashType, Transaction, TxIn, Witness,
 };
 use bitcoincore_rpc::{Auth, Client, RawTx, RpcApi};
 use serde::Serialize;
 use serde_json::{from_str, json, Value};
-use std::collections::HashMap;
 use std::env;
 use std::fs;
 use std::process::Child;
 use std::process::Command;
 use std::str::FromStr;
+use serde::Deserialize;
 
-use db_core::models::ProcessedTransaction;
+use sdk::processed_transaction::ProcessedTransaction;
 
 use crate::constants::{
     BITCOIN_NODE_ENDPOINT, BITCOIN_NODE_PASSWORD, BITCOIN_NODE_USERNAME,
@@ -30,13 +29,12 @@ use crate::constants::{
     TRANSACTION_NOT_FOUND_CODE
 };
 use crate::models::{
-    BitcoinRpcInfo, CallerInfo, DeployProgramParams, ReadUtxoParams,
+    BitcoinRpcInfo, CallerInfo,
 };
-use arch_program::pubkey::Pubkey;
+use sdk::arch_program::pubkey::Pubkey;
 use sdk::signature::Signature;
-use db_core::models::RuntimeTransaction;
-use arch_program::message::Message;
-use arch_program::entrypoint::MAX_PERMITTED_DATA_INCREASE;
+use sdk::runtime_transaction::RuntimeTransaction;
+use sdk::arch_program::message::Message;
 
 fn process_result(response: String) -> Result<Value> {
     let result = from_str::<Value>(&response).expect("result should be Value parseable");
@@ -132,8 +130,8 @@ pub fn with_secret_key_file(file_path: &str) -> Result<(UntweakedKeypair, Pubkey
     Ok((keypair, pubkey))
 }
 
-use arch_program::system_instruction::SystemInstruction;
-use db_core::models::RUNTIME_TX_SIZE_LIMIT;
+use sdk::arch_program::system_instruction::SystemInstruction;
+use sdk::runtime_transaction::RUNTIME_TX_SIZE_LIMIT;
 
 fn extend_bytes_max_len() -> usize {
     
@@ -196,7 +194,7 @@ pub fn sign_and_send_instruction(
     Ok((result, hashed_instruction))
 }
 
-use arch_program::instruction::Instruction;
+use sdk::arch_program::instruction::Instruction;
 
 pub fn sign_and_send_transaction(
     instructions: Vec<Instruction>,
@@ -285,7 +283,7 @@ pub fn deploy_program_txs(
         .collect::<Vec<String>>();
 
     for txid in txids {
-        let processed_tx = get_processed_transaction(NODE1_ADDRESS, txid.clone())
+        let _processed_tx = get_processed_transaction(NODE1_ADDRESS, txid.clone())
         .expect("get processed transaction should not fail");
 
         println!("{:?}", read_account_info(NODE1_ADDRESS, program_pubkey.clone()));
@@ -330,7 +328,13 @@ pub fn start_dkg() {
     };
 }
 
-use validator::rpc::methods::AccountInfoResult;
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AccountInfoResult {
+    pub owner: Pubkey,
+    pub data: Vec<u8>,
+    pub utxo: String,
+    pub is_executable: bool,
+}
 
 /// Read Utxo given the utxo ID
 pub fn read_account_info(url: &str, pubkey: Pubkey) -> Result<AccountInfoResult> {

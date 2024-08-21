@@ -1,0 +1,15 @@
+[package]
+name = "liquiditypool"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+common = { path = "../common" }
+arch_program = { path = "../../program" }
+
+bitcoincore-rpc = "0.18.0"
+hex = "0.4.3"
+borsh = { version = "1.4.0", features = ["derive"] }
+
+[dev-dependencies]
+serial_test = "3.1.1"

@@ -1,16 +1,6 @@
-mod entrypoint;
-mod pubkey;
-mod signature;
-mod utxo;
-mod message;
-mod instruction;
-mod runtime_transaction;
-mod syscalls;
+pub use arch_program;
 
-pub use pubkey::*;
-pub use signature::*;
-pub use utxo::*;
-pub use message::*;
-pub use instruction::*;
-pub use runtime_transaction::*;
-pub use syscalls::*;
+pub mod signature;
+pub mod transaction_to_sign;
+pub mod runtime_transaction;
+pub mod processed_transaction;
