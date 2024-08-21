@@ -68,7 +68,7 @@ sh -c "$(curl -sSfL https://release.solana.com/v1.18.18/install)"
 > Ref: [Solana Docs].
 
 ### 2.2 - Compile and run the example program
-- Access the `examples/helloworld` folder:
+- Access the `examples/helloworld/program` folder:
 ```bash
 cd examples/helloworld/program
 ```
