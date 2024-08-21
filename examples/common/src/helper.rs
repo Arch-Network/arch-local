@@ -12,8 +12,7 @@ use bitcoin::{
     Amount, OutPoint, ScriptBuf, Sequence, TapSighashType, Transaction, TxIn, TxOut, Witness,
 };
 use bitcoincore_rpc::{Auth, Client, RawTx, RpcApi};
-use serde::{Serialize, Deserialize};
-use borsh::{BorshSerialize, BorshDeserialize};
+use serde::Serialize;
 use serde_json::{from_str, json, Value};
 use std::collections::HashMap;
 use std::env;
@@ -21,41 +20,23 @@ use std::fs;
 use std::process::Child;
 use std::process::Command;
 use std::str::FromStr;
-use risc0_zkvm::Receipt;
 
-use sdk::{Pubkey, Instruction, UtxoMeta, RuntimeTransaction, Message, Signature};
+use db_core::models::ProcessedTransaction;
 
 use crate::constants::{
     BITCOIN_NODE_ENDPOINT, BITCOIN_NODE_PASSWORD, BITCOIN_NODE_USERNAME,
-    CALLER_FILE_PATH, GET_BEST_BLOCK_HASH, GET_BLOCK, GET_CONTRACT_ADDRESS,
-    GET_PROCESSED_TRANSACTION, GET_PROGRAM, NODE1_ADDRESS, READ_UTXO,
+    CALLER_FILE_PATH, GET_BEST_BLOCK_HASH, GET_BLOCK, GET_ACCOUNT_ADDRESS,
+    GET_PROCESSED_TRANSACTION, GET_PROGRAM, NODE1_ADDRESS, READ_ACCOUNT_INFO,
     TRANSACTION_NOT_FOUND_CODE
 };
 use crate::models::{
     BitcoinRpcInfo, CallerInfo, DeployProgramParams, ReadUtxoParams,
 };
-
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
-pub struct ReadUtxoResult {
-    pub utxo_id: String,
-    pub data: Vec<u8>,
-    pub authority: Pubkey,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize, BorshDeserialize, BorshSerialize)]
-pub enum Status {
-    Processing,
-    Success,
-    Failed,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct ProcessedTransaction {
-    pub runtime_transaction: RuntimeTransaction,
-    pub receipts: HashMap<String, Receipt>,
-    pub status: Status,
-    pub bitcoin_txids: HashMap<String, String>,
-}
+use arch_program::pubkey::Pubkey;
+use sdk::signature::Signature;
+use db_core::models::RuntimeTransaction;
+use arch_program::message::Message;
+use arch_program::entrypoint::MAX_PERMITTED_DATA_INCREASE;
 
 fn process_result(response: String) -> Result<Value> {
     let result = from_str::<Value>(&response).expect("result should be Value parseable");
@@ -119,10 +100,9 @@ fn post_data<T: Serialize + std::fmt::Debug>(url: &str, method: &str, params: T)
             "method": method,
             "params": params,
         }))
-        .send()
-        .expect("post method should not fail");
+        .send();
 
-    res.text().expect("result should be text decodable")
+    res.expect("post method should not fail").text().expect("result should be text decodable")
 }
 
 /// Returns a caller information using the secret key file specified
@@ -131,36 +111,119 @@ fn get_trader(trader_id: u64) -> Result<CallerInfo> {
     Ok(CallerInfo::with_secret_key_file(file_path)?)
 }
 
+use bitcoin::key::UntweakedKeypair;
+use crate::helper::secp256k1::SecretKey;
+use rand_core::OsRng;
+use bitcoin::XOnlyPublicKey;
+
+pub fn with_secret_key_file(file_path: &str) -> Result<(UntweakedKeypair, Pubkey)> {
+    let secp = Secp256k1::new();
+    let secret_key = match fs::read_to_string(file_path) {
+        Ok(key) => SecretKey::from_str(&key).unwrap(),
+        Err(_) => {
+            let (key, _) = secp.generate_keypair(&mut OsRng);
+            fs::write(file_path, &key.display_secret().to_string())
+                .map_err(|_| anyhow!("Unable to write file"))?;
+            key
+        }
+    };
+    let keypair = UntweakedKeypair::from_secret_key(&secp, &secret_key);
+    let pubkey = Pubkey::from_slice(&XOnlyPublicKey::from_keypair(&keypair).0.serialize());
+    Ok((keypair, pubkey))
+}
+
+use arch_program::system_instruction::SystemInstruction;
+use db_core::models::RUNTIME_TX_SIZE_LIMIT;
+
+fn extend_bytes_max_len() -> usize {
+    
+    let message = Message {
+        signers: vec![Pubkey::system_program()],
+        instructions: vec![SystemInstruction::new_extend_bytes_instruction(
+            vec![0_u8; 8],
+            Pubkey::system_program(),
+        )],
+    };
+
+    RUNTIME_TX_SIZE_LIMIT - RuntimeTransaction {
+        version: 0,
+        signatures: vec![Signature([0_u8; 64].to_vec())],
+        message,
+    }.serialize().len()
+
+}
+
 /// Creates an instruction, signs it as a message
 /// and sends the signed message as a transaction
 pub fn sign_and_send_instruction(
-    program_id: Pubkey,
-    utxos: Vec<UtxoMeta>,
-    instruction_data: Vec<u8>,
+    instruction: Instruction,
+    signers: Vec<UntweakedKeypair>
 ) -> Result<(String, String)> {
-    let caller = CallerInfo::with_secret_key_file(CALLER_FILE_PATH)?;
 
-    let instruction = Instruction {
-        program_id,
-        utxos,
-        data: instruction_data,
-    };
+    let pubkeys = signers.iter()
+        .map(|signer| Pubkey::from_slice(&XOnlyPublicKey::from_keypair(signer).0.serialize()))
+        .collect::<Vec<Pubkey>>();
 
     let message = Message {
-        signers: vec![Pubkey::from_slice(&caller.public_key.serialize())],
+        signers: pubkeys,
         instructions: vec![instruction.clone()],
     };
-    let digest_slice = hex::decode(message.hash().expect("message should be hashable"))
+    let digest_slice = hex::decode(message.hash())
         .expect("hashed message should be decodable");
     let sig_message = secp256k1::Message::from_digest_slice(&digest_slice)
         .expect("signed message should be gotten from digest slice");
 
     let secp = Secp256k1::new();
-    let sig = secp.sign_schnorr(&sig_message, &caller.key_pair);
+    let signatures = signers.iter()
+        .map(|signer| Signature(secp.sign_schnorr(&sig_message, &signer).serialize().to_vec()))
+        .collect::<Vec<Signature>>();
 
     let params = RuntimeTransaction {
         version: 0,
-        signatures: vec![Signature(sig.serialize().to_vec())],
+        signatures,
+        message,
+    };
+    
+    println!("{:?}", params);
+
+    let result = process_result(post_data(NODE1_ADDRESS, "send_transaction", params))
+        .expect("send_transaction should not fail")
+        .as_str()
+        .expect("cannot convert result to string")
+        .to_string();
+    let hashed_instruction = instruction.hash();
+
+    Ok((result, hashed_instruction))
+}
+
+use arch_program::instruction::Instruction;
+
+pub fn sign_and_send_transaction(
+    instructions: Vec<Instruction>,
+    signers: Vec<UntweakedKeypair>,
+) -> Result<String> {
+
+    let pubkeys = signers.iter()
+        .map(|signer| Pubkey::from_slice(&XOnlyPublicKey::from_keypair(signer).0.serialize()))
+        .collect::<Vec<Pubkey>>();
+
+    let message = Message {
+        signers: pubkeys,
+        instructions,
+    };
+    let digest_slice = hex::decode(message.hash())
+        .expect("hashed message should be decodable");
+    let sig_message = secp256k1::Message::from_digest_slice(&digest_slice)
+        .expect("signed message should be gotten from digest slice");
+
+    let secp = Secp256k1::new();
+    let signatures = signers.iter()
+        .map(|signer| Signature(secp.sign_schnorr(&sig_message, signer).serialize().to_vec()))
+        .collect::<Vec<Signature>>();
+
+    let params = RuntimeTransaction {
+        version: 0,
+        signatures,
         message,
     };
     let result = process_result(post_data(NODE1_ADDRESS, "send_transaction", params))
@@ -168,22 +231,88 @@ pub fn sign_and_send_instruction(
         .as_str()
         .expect("cannot convert result to string")
         .to_string();
-    let hashed_instruction = instruction
-        .hash()
-        .expect("instruction hashing should not fail");
 
-    Ok((result, hashed_instruction))
+    Ok(result)
 }
 
 /// Deploys the HelloWorld program using the compiled ELF
-pub fn deploy_program() -> String {
-    let elf = fs::read("target/program.elf").expect("elf path should be available");
-    let params = DeployProgramParams { elf };
-    process_result(post_data(NODE1_ADDRESS, "deploy_program", params))
-        .expect("deploy_program should not fail")
-        .as_str()
-        .expect("cannot convert result to string")
-        .to_string()
+pub fn deploy_program_txs(
+    program_keypair: UntweakedKeypair, 
+    elf_path: &str,
+) {
+
+    let program_pubkey = Pubkey::from_slice(&XOnlyPublicKey::from_keypair(&program_keypair).0.serialize());
+
+    let elf = fs::read(elf_path).expect("elf path should be available");
+    let txs = elf.chunks(extend_bytes_max_len()).enumerate().map(|(i, chunk)| {
+        let mut bytes = vec![];
+
+        let offset: u32 = (i * extend_bytes_max_len()) as u32;
+        let len: u32 = chunk.len() as u32;
+
+        bytes.extend(offset.to_le_bytes());
+        bytes.extend(len.to_le_bytes());
+        bytes.extend(chunk);
+
+        let message = Message {
+            signers: vec![program_pubkey.clone()],
+            instructions: vec![SystemInstruction::new_extend_bytes_instruction(
+                bytes,
+                program_pubkey.clone(),
+            )],
+        };
+
+        let digest_slice = hex::decode(message.hash())
+            .expect("hashed message should be decodable");
+        let sig_message = secp256k1::Message::from_digest_slice(&digest_slice)
+            .expect("signed message should be gotten from digest slice");
+
+        let secp = Secp256k1::new();
+    
+        RuntimeTransaction {
+            version: 0,
+            signatures: vec![Signature(secp.sign_schnorr(&sig_message, &program_keypair).serialize().to_vec())],
+            message,
+        }
+    }).collect::<Vec<RuntimeTransaction>>();
+
+    let txids = process_result(post_data(NODE1_ADDRESS, "send_transactions", txs))
+        .expect("send_transaction should not fail")
+        .as_array()
+        .expect("cannot convert result to array")
+        .iter()
+        .map(|r| r.as_str().expect("cannot convert object to string").to_string())
+        .collect::<Vec<String>>();
+
+    for txid in txids {
+        let processed_tx = get_processed_transaction(NODE1_ADDRESS, txid.clone())
+        .expect("get processed transaction should not fail");
+
+        println!("{:?}", read_account_info(NODE1_ADDRESS, program_pubkey.clone()));
+    }
+
+    
+
+    // for tx_batch in txs.chunks(12) {
+    //     let mut txids = vec![];
+    //     for tx in tx_batch {
+    //         let txid = process_result(post_data(NODE1_ADDRESS, "send_transaction", tx))
+    //             .expect("send_transaction should not fail")
+    //             .as_str()
+    //             .expect("cannot convert result to string")
+    //             .to_string();
+
+    //         println!("sent tx {:?}", txid);
+    //         txids.push(txid);
+    //     };
+
+    //     for txid in txids {
+    //         let processed_tx = get_processed_transaction(NODE1_ADDRESS, txid.clone())
+    //             .expect("get processed transaction should not fail");
+
+    //         println!("{:?}", read_account_info(NODE1_ADDRESS, program_pubkey.clone()));
+    //     }
+    // }
 }
 
 /// Starts Key Exchange by calling the RPC method
@@ -201,12 +330,13 @@ pub fn start_dkg() {
     };
 }
 
+use validator::rpc::methods::AccountInfoResult;
+
 /// Read Utxo given the utxo ID
-pub fn read_utxo(url: &str, utxo_id: String) -> Result<ReadUtxoResult> {
-    let params = ReadUtxoParams { utxo_id };
-    let result = process_result(post_data(url, READ_UTXO, params))
-        .expect("read_utxo should not fail");
-    serde_json::from_value(result).map_err(|_| anyhow!("Unable to decode read_utxo result"))
+pub fn read_account_info(url: &str, pubkey: Pubkey) -> Result<AccountInfoResult> {
+    let result = process_result(post_data(url, READ_ACCOUNT_INFO, pubkey))
+        .expect("read_account_info should not fail");
+    serde_json::from_value(result).map_err(|_| anyhow!("Unable to decode read_account_info result"))
 }
 
 /// Returns a program given the program ID
@@ -254,7 +384,7 @@ pub fn get_processed_transaction(url: &str, tx_id: String) -> Result<ProcessedTr
 
     if let Ok(ref tx) = processed_tx {
         let mut p = tx.clone();
-        while p["status"].as_str().unwrap() != "Success" {
+        while p["status"].as_str().unwrap() != "Processed" {
             println!("Processed transaction is not yet finalized. Retrying...");
             std::thread::sleep(std::time::Duration::from_secs(wait_time));
             p = process_get_transaction_result(post_data(url, GET_PROCESSED_TRANSACTION, tx_id.clone())).unwrap();
@@ -267,7 +397,7 @@ pub fn get_processed_transaction(url: &str, tx_id: String) -> Result<ProcessedTr
         processed_tx = Ok(p);
     }
 
-    Ok(serde_json::from_value::<ProcessedTransaction>(processed_tx?).unwrap())
+    Ok(serde_json::from_value(processed_tx?).unwrap())
 }
 
 pub fn prepare_fees() -> String {
@@ -345,7 +475,7 @@ pub fn prepare_fees() -> String {
     tx.raw_hex()
 }
 
-pub fn send_utxo() -> String {
+pub fn send_utxo(pubkey: Pubkey) -> (String, u32) {
     let userpass = Auth::UserPass(
         BITCOIN_NODE_USERNAME.to_string(),
         BITCOIN_NODE_PASSWORD.to_string(),
@@ -356,9 +486,16 @@ pub fn send_utxo() -> String {
     let caller = CallerInfo::with_secret_key_file(CALLER_FILE_PATH)
         .expect("getting caller info should not fail");
 
+    let address = get_account_address(pubkey);
+    println!("address {:?}", address);
+    let account_address = Address::from_str(&address)
+        .unwrap()
+        .require_network(bitcoin::Network::Regtest)
+        .unwrap();
+
     let txid = rpc
         .send_to_address(
-            &caller.address,
+            &account_address,
             Amount::from_sat(3000),
             None,
             None,
@@ -375,77 +512,18 @@ pub fn send_utxo() -> String {
     let mut vout = 0;
 
     for (index, output) in sent_tx.output.iter().enumerate() {
-        if output.script_pubkey == caller.address.script_pubkey() {
+        if output.script_pubkey == account_address.script_pubkey() {
             vout = index as u32;
+            println!("FOUUUND MATCHING UTXO")
         }
     }
 
-    let network_address = get_network_address("");
-
-    let mut tx = Transaction {
-        version: Version::TWO,
-        input: vec![TxIn {
-            previous_output: OutPoint { txid, vout },
-            script_sig: ScriptBuf::new(),
-            sequence: Sequence::MAX,
-            witness: Witness::new(),
-        }],
-        output: vec![
-            TxOut {
-                value: Amount::from_sat(0),
-                script_pubkey: ScriptBuf::builder()
-                    .push_opcode(OP_RETURN)
-                    .push_x_only_key(&caller.public_key)
-                    .into_script(),
-            },
-            TxOut {
-                value: Amount::from_sat(1500),
-                script_pubkey: Address::from_str(&network_address)
-                    .unwrap()
-                    .require_network(bitcoin::Network::Regtest)
-                    .unwrap()
-                    .script_pubkey(),
-            },
-        ],
-        lock_time: LockTime::ZERO,
-    };
-
-    let sighash_type = TapSighashType::NonePlusAnyoneCanPay;
-    let raw_tx = rpc
-        .get_raw_transaction(&txid, None)
-        .expect("raw transaction should not fail");
-    let prevouts = vec![raw_tx.output[vout as usize].clone()];
-    let prevouts = Prevouts::All(&prevouts);
-
-    let mut sighasher = SighashCache::new(&mut tx);
-    let sighash = sighasher
-        .taproot_key_spend_signature_hash(0, &prevouts, sighash_type)
-        .expect("should not fail to construct sighash");
-
-    // Sign the sighash using the secp256k1 library (exported by rust-bitcoin).
-    let secp = Secp256k1::new();
-    let tweaked: TweakedKeypair = caller.key_pair.tap_tweak(&secp, None);
-    let msg = secp256k1::Message::from(sighash);
-    let signature = secp.sign_schnorr(&msg, &tweaked.to_inner());
-
-    // Update the witness stack.
-    let signature = bitcoin::taproot::Signature {
-        sig: signature,
-        hash_ty: sighash_type,
-    };
-    tx.input[0].witness.push(signature.to_vec());
-
-    // BOOM! Transaction signed and ready to broadcast.
-    rpc.send_raw_transaction(tx.raw_hex())
-        .expect("sending raw transaction should not fail")
-        .to_string()
+    (txid.to_string(), vout)
 }
 
-fn get_network_address(data: &str) -> String {
-    let mut params = HashMap::new();
-    params.insert("data", data.as_bytes());
-    process_result(post_data(NODE1_ADDRESS, GET_CONTRACT_ADDRESS, params))
-        .expect("get_contract_address should not fail")
+fn get_account_address(pubkey: Pubkey) -> String {
+    process_result(post_data(NODE1_ADDRESS, GET_ACCOUNT_ADDRESS, pubkey))
+        .expect("get_account_address should not fail")
         .as_str()
         .expect("cannot convert result to string")
         .to_string()

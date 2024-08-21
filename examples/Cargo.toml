@@ -1,4 +1,10 @@
 [workspace]
+resolver = "2"
+
 members = [ 
-    "helloworld", "counter", "bank_account", "common",
+    #"counter", 
+    "helloworld", 
+    #"counter", 
+    #"bank_account", 
+    "common",
 ]
