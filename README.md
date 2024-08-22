@@ -5,8 +5,8 @@ This repo contains a local arch-network development stack, as well as some examp
 ## Requirements:
 - [Rust]
 - [Docker]
-- [Solana CLI](#21---install-solana-cli)
-- [A C++ Compiler (gcc/clang)](#22---install-c-compiler)
+- [A C++ Compiler (gcc/clang)](#21-install-c-compiler)
+- [Solana CLI](#22---install-solana-cli)
 
 ## Getting Started
 
@@ -53,22 +53,7 @@ export DOCKER_DEFAULT_PLATFORM=linux/amd64
 
 ## 2 - Compile and run the `helloworld` example program
 
-### 2.1 - Install Solana CLI
-
-To compile the examples, the [Solana] CLI toolchain must be installed. Execute the following commands to install the toolchain to your local system.
-
-#### MacOS & Linux
-
-```bash
-sh -c "$(curl -sSfL https://release.solana.com/v1.18.18/install)"
-```
-
-> You can replace v1.18.18 with the release tag matching the software version of your desired release, or use one of the three symbolic channel names: stable, beta, or edge. 
->
-> Ref: [Solana Docs].
-
-### 2.2 - Install C++ Compiler
-
+### 2.1. Install C++ Compiler
 For MacOS users, this *should* already be installed alongside [gcc] so you can skip this section.
 
 For Linux (Debian/Ubuntu) users, this must be installed if it isn't already. We will manually install the gcc-multilib.
@@ -85,6 +70,19 @@ cargo:warning=/usr/include/stdint.h:26:10: fatal error: 'bits/libc-header-start.
   cargo:warning=      |          ^~~~~~~~~~~~~~~~~~~~~~~~~~
   cargo:warning=1 error generated.
 ```
+
+### 2.2 - Install Solana CLI
+To compile the examples, the [Solana] CLI toolchain must be installed. Execute the following commands to install the toolchain to your local system.
+
+#### MacOS & Linux
+
+```bash
+sh -c "$(curl -sSfL https://release.solana.com/v1.18.18/install)"
+```
+
+> You can replace v1.18.18 with the release tag matching the software version of your desired release, or use one of the three symbolic channel names: stable, beta, or edge. 
+>
+> Ref: [Solana Docs].
 
 ### 2.3 - Compile and run the example program
 - Access the `examples/helloworld/program` folder:
