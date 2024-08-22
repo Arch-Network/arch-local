@@ -48,7 +48,19 @@ docker compose up
 export DOCKER_DEFAULT_PLATFORM=linux/amd64
 ```
 
+**NOTE:** Additionally, if you have an Intel chip (ie, x86_64), you may encounter the following error when executing `docker compose up`; we recommend removing the `--platform=linux/arm64` flag within [Line 1: Dockerfile]:
+
+```bash
+=> ERROR [init-bootnode 2/3] RUN set -ex && apt-get update && apt-get install -qq --no-install-recommends curl jq               0.6s
+------
+ > [init-bootnode 2/3] RUN set -ex && apt-get update && apt-get install -qq --no-install-recommends curl jq:
+0.314 exec /bin/sh: exec format error
+------
+failed to solve: process "/bin/sh -c set -ex \t&& apt-get update \t&& apt-get install -qq --no-install-recommends curl jq" did not complete successfully: exit code: 1
+```
+
 ### Initializing nodes
+If everything pulls and initializes correctly, the logs should resemble the following:
 ![](.readme_assets/docker-init.gif)
 
 ## 2 - Compile and run the `helloworld` example program
@@ -131,6 +143,7 @@ cargo-build-sbf
 > If you are still experiencing errors, join our [Discord dev-chat] channel for more support.
 
 ### Build program
+If everything builds correctly, the `cargo-build-sbf` output should resemble the following:
 ![](.readme_assets/helloworld-build.gif)
 
 - This will compile the example program into a eBPF ELF file (the executable format expected by the Arch virtual machine). You'll find the generated shared object file at: `./target/deploy/helloworldprogram.so`
@@ -191,3 +204,5 @@ rustflags = [
 [Validator]: ./compose.yaml#L51
 [Discord dev-chat]: https://discord.com/channels/1241112027963986001/1270921925991989268
 [mempool.space]: https://mempool.dev.aws.archnetwork.xyz 
+[Line 1: Dockerfile]: https://github.com/Arch-Network/arch-local/blob/main/init/Dockerfile#L1
+
