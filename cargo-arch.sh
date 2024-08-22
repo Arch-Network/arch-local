@@ -1,4 +1,7 @@
-#!/bin/bash
+#!/bin/bash -x
+
+# Exit on error
+set -e
 
 # Check if a project name was provided
 if [ -z "$1" ]; then
@@ -14,7 +17,7 @@ PROJECT_NAME=$1
 cargo new --lib "examples/$PROJECT_NAME"
 
 # Navigate into the project directory
-cd "examples/$PROJECT_NAME" || exit
+cd "examples/$PROJECT_NAME"
 
 # Add local dependencies
 echo -e 'common = { path = "../common" }\narch_program = { path = "../../program" }' >> Cargo.toml 
@@ -40,7 +43,7 @@ cargo new --lib $CONCAT_PROJECT_NAME
 mv $CONCAT_PROJECT_NAME program
 
 # Navigate into the program directory
-cd program || exit
+cd program
 
 # Add workspace to top of Cargo.toml
 echo '[workspace]' | cat - Cargo.toml > temp && mv temp Cargo.toml
