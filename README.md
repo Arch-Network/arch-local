@@ -150,7 +150,12 @@ rustflags = [
 ```
 
 ## Useful Resources
-
+- [cargo-arch]
+  - A shell script for creating new projects within `/examples`
+  ```bash
+  # usage
+  ./cargo-arch <my_project>
+  ```
 - [mempool.space] 
    -  Bitcoin mempool and blockchain explorer. This mempool.space instance monitors the regtest Bitcoin blockchain being used to run and validate all examples in this repo.
 - [Solana Cli]
@@ -171,3 +176,5 @@ rustflags = [
 [Validator]: ./compose.yaml#L51
 [Discord dev-chat]: https://discord.com/channels/1241112027963986001/1270921925991989268
 [mempool.space]: https://mempool.dev.aws.archnetwork.xyz 
+[cargo-arch]: ./cargo-arch.sh
+
