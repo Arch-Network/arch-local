@@ -1,27 +1,15 @@
 use arch_program::{
-    account::{AccountInfo},
-    entrypoint,
-    instruction::Instruction,
-    msg,
-    program::{
-        invoke, set_return_data, get_bitcoin_tx, 
-        validate_utxo_ownership, get_network_xonly_pubkey,
-        set_transaction_to_sign, next_account_info,
-        get_account_script_pubkey
-    },
-    helper::get_state_trasition_tx,
-    transaction_to_sign::TransactionToSign,
+    account::AccountInfo,
+    entrypoint, msg,
+    program::{get_account_script_pubkey, next_account_info},
     program_error::ProgramError,
-    input_to_sign::InputToSign,
     pubkey::Pubkey,
-    utxo::UtxoMeta,
-    system_instruction::SystemInstruction,
 };
-use borsh::{BorshSerialize, BorshDeserialize};
+use borsh::{BorshDeserialize, BorshSerialize};
 
 entrypoint!(process_instruction);
 pub fn process_instruction(
-    program_id: &Pubkey,
+    _program_id: &Pubkey,
     accounts: &[AccountInfo],
     instruction_data: &[u8],
 ) -> Result<(), ProgramError> {
@@ -40,11 +28,15 @@ pub fn process_instruction(
     if new_data.as_bytes().len() > data_len {
         account.realloc(new_data.len(), true)?;
     }
-    
+
     let script_pubkey = get_account_script_pubkey(account.key);
     msg!("script_pubkey {:?}", script_pubkey);
 
-    account.data.try_borrow_mut().unwrap().copy_from_slice(new_data.as_bytes());
+    account
+        .data
+        .try_borrow_mut()
+        .unwrap()
+        .copy_from_slice(new_data.as_bytes());
 
     msg!("hello");
 

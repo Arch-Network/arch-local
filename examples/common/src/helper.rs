@@ -11,6 +11,7 @@ use bitcoin::{
     Amount, OutPoint, ScriptBuf, Sequence, TapSighashType, Transaction, TxIn, Witness,
 };
 use bitcoincore_rpc::{Auth, Client, RawTx, RpcApi};
+use serde::Deserialize;
 use serde::Serialize;
 use serde_json::{from_str, json, Value};
 use std::env;
@@ -18,23 +19,19 @@ use std::fs;
 use std::process::Child;
 use std::process::Command;
 use std::str::FromStr;
-use serde::Deserialize;
 
 use sdk::processed_transaction::ProcessedTransaction;
 
 use crate::constants::{
-    BITCOIN_NODE_ENDPOINT, BITCOIN_NODE_PASSWORD, BITCOIN_NODE_USERNAME,
-    CALLER_FILE_PATH, GET_BEST_BLOCK_HASH, GET_BLOCK, GET_ACCOUNT_ADDRESS,
-    GET_PROCESSED_TRANSACTION, GET_PROGRAM, NODE1_ADDRESS, READ_ACCOUNT_INFO,
-    TRANSACTION_NOT_FOUND_CODE
+    BITCOIN_NODE_ENDPOINT, BITCOIN_NODE_PASSWORD, BITCOIN_NODE_USERNAME, CALLER_FILE_PATH,
+    GET_ACCOUNT_ADDRESS, GET_BEST_BLOCK_HASH, GET_BLOCK, GET_PROCESSED_TRANSACTION, GET_PROGRAM,
+    NODE1_ADDRESS, READ_ACCOUNT_INFO, TRANSACTION_NOT_FOUND_CODE,
 };
-use crate::models::{
-    BitcoinRpcInfo, CallerInfo,
-};
-use sdk::arch_program::pubkey::Pubkey;
-use sdk::signature::Signature;
-use sdk::runtime_transaction::RuntimeTransaction;
+use crate::models::{BitcoinRpcInfo, CallerInfo};
 use sdk::arch_program::message::Message;
+use sdk::arch_program::pubkey::Pubkey;
+use sdk::runtime_transaction::RuntimeTransaction;
+use sdk::signature::Signature;
 
 fn process_result(response: String) -> Result<Value> {
     let result = from_str::<Value>(&response).expect("result should be Value parseable");
@@ -100,7 +97,9 @@ fn post_data<T: Serialize + std::fmt::Debug>(url: &str, method: &str, params: T)
         }))
         .send();
 
-    res.expect("post method should not fail").text().expect("result should be text decodable")
+    res.expect("post method should not fail")
+        .text()
+        .expect("result should be text decodable")
 }
 
 /// Returns a caller information using the secret key file specified
@@ -109,10 +108,10 @@ fn get_trader(trader_id: u64) -> Result<CallerInfo> {
     Ok(CallerInfo::with_secret_key_file(file_path)?)
 }
 
-use bitcoin::key::UntweakedKeypair;
 use crate::helper::secp256k1::SecretKey;
-use rand_core::OsRng;
+use bitcoin::key::UntweakedKeypair;
 use bitcoin::XOnlyPublicKey;
+use rand_core::OsRng;
 
 pub fn with_secret_key_file(file_path: &str) -> Result<(UntweakedKeypair, Pubkey)> {
     let secp = Secp256k1::new();
@@ -134,7 +133,6 @@ use sdk::arch_program::system_instruction::SystemInstruction;
 use sdk::runtime_transaction::RUNTIME_TX_SIZE_LIMIT;
 
 fn extend_bytes_max_len() -> usize {
-    
     let message = Message {
         signers: vec![Pubkey::system_program()],
         instructions: vec![SystemInstruction::new_extend_bytes_instruction(
@@ -143,22 +141,24 @@ fn extend_bytes_max_len() -> usize {
         )],
     };
 
-    RUNTIME_TX_SIZE_LIMIT - RuntimeTransaction {
-        version: 0,
-        signatures: vec![Signature([0_u8; 64].to_vec())],
-        message,
-    }.serialize().len()
-
+    RUNTIME_TX_SIZE_LIMIT
+        - RuntimeTransaction {
+            version: 0,
+            signatures: vec![Signature([0_u8; 64].to_vec())],
+            message,
+        }
+        .serialize()
+        .len()
 }
 
 /// Creates an instruction, signs it as a message
 /// and sends the signed message as a transaction
 pub fn sign_and_send_instruction(
     instruction: Instruction,
-    signers: Vec<UntweakedKeypair>
+    signers: Vec<UntweakedKeypair>,
 ) -> Result<(String, String)> {
-
-    let pubkeys = signers.iter()
+    let pubkeys = signers
+        .iter()
         .map(|signer| Pubkey::from_slice(&XOnlyPublicKey::from_keypair(signer).0.serialize()))
         .collect::<Vec<Pubkey>>();
 
@@ -166,14 +166,20 @@ pub fn sign_and_send_instruction(
         signers: pubkeys,
         instructions: vec![instruction.clone()],
     };
-    let digest_slice = hex::decode(message.hash())
-        .expect("hashed message should be decodable");
+    let digest_slice = hex::decode(message.hash()).expect("hashed message should be decodable");
     let sig_message = secp256k1::Message::from_digest_slice(&digest_slice)
         .expect("signed message should be gotten from digest slice");
 
     let secp = Secp256k1::new();
-    let signatures = signers.iter()
-        .map(|signer| Signature(secp.sign_schnorr(&sig_message, &signer).serialize().to_vec()))
+    let signatures = signers
+        .iter()
+        .map(|signer| {
+            Signature(
+                secp.sign_schnorr(&sig_message, &signer)
+                    .serialize()
+                    .to_vec(),
+            )
+        })
         .collect::<Vec<Signature>>();
 
     let params = RuntimeTransaction {
@@ -181,7 +187,7 @@ pub fn sign_and_send_instruction(
         signatures,
         message,
     };
-    
+
     println!("{:?}", params);
 
     let result = process_result(post_data(NODE1_ADDRESS, "send_transaction", params))
@@ -200,8 +206,8 @@ pub fn sign_and_send_transaction(
     instructions: Vec<Instruction>,
     signers: Vec<UntweakedKeypair>,
 ) -> Result<String> {
-
-    let pubkeys = signers.iter()
+    let pubkeys = signers
+        .iter()
         .map(|signer| Pubkey::from_slice(&XOnlyPublicKey::from_keypair(signer).0.serialize()))
         .collect::<Vec<Pubkey>>();
 
@@ -209,13 +215,13 @@ pub fn sign_and_send_transaction(
         signers: pubkeys,
         instructions,
     };
-    let digest_slice = hex::decode(message.hash())
-        .expect("hashed message should be decodable");
+    let digest_slice = hex::decode(message.hash()).expect("hashed message should be decodable");
     let sig_message = secp256k1::Message::from_digest_slice(&digest_slice)
         .expect("signed message should be gotten from digest slice");
 
     let secp = Secp256k1::new();
-    let signatures = signers.iter()
+    let signatures = signers
+        .iter()
         .map(|signer| Signature(secp.sign_schnorr(&sig_message, signer).serialize().to_vec()))
         .collect::<Vec<Signature>>();
 
@@ -234,62 +240,72 @@ pub fn sign_and_send_transaction(
 }
 
 /// Deploys the HelloWorld program using the compiled ELF
-pub fn deploy_program_txs(
-    program_keypair: UntweakedKeypair, 
-    elf_path: &str,
-) {
-
-    let program_pubkey = Pubkey::from_slice(&XOnlyPublicKey::from_keypair(&program_keypair).0.serialize());
+pub fn deploy_program_txs(program_keypair: UntweakedKeypair, elf_path: &str) {
+    let program_pubkey =
+        Pubkey::from_slice(&XOnlyPublicKey::from_keypair(&program_keypair).0.serialize());
 
     let elf = fs::read(elf_path).expect("elf path should be available");
-    let txs = elf.chunks(extend_bytes_max_len()).enumerate().map(|(i, chunk)| {
-        let mut bytes = vec![];
+    let txs = elf
+        .chunks(extend_bytes_max_len())
+        .enumerate()
+        .map(|(i, chunk)| {
+            let mut bytes = vec![];
 
-        let offset: u32 = (i * extend_bytes_max_len()) as u32;
-        let len: u32 = chunk.len() as u32;
+            let offset: u32 = (i * extend_bytes_max_len()) as u32;
+            let len: u32 = chunk.len() as u32;
 
-        bytes.extend(offset.to_le_bytes());
-        bytes.extend(len.to_le_bytes());
-        bytes.extend(chunk);
+            bytes.extend(offset.to_le_bytes());
+            bytes.extend(len.to_le_bytes());
+            bytes.extend(chunk);
 
-        let message = Message {
-            signers: vec![program_pubkey.clone()],
-            instructions: vec![SystemInstruction::new_extend_bytes_instruction(
-                bytes,
-                program_pubkey.clone(),
-            )],
-        };
+            let message = Message {
+                signers: vec![program_pubkey.clone()],
+                instructions: vec![SystemInstruction::new_extend_bytes_instruction(
+                    bytes,
+                    program_pubkey.clone(),
+                )],
+            };
 
-        let digest_slice = hex::decode(message.hash())
-            .expect("hashed message should be decodable");
-        let sig_message = secp256k1::Message::from_digest_slice(&digest_slice)
-            .expect("signed message should be gotten from digest slice");
+            let digest_slice =
+                hex::decode(message.hash()).expect("hashed message should be decodable");
+            let sig_message = secp256k1::Message::from_digest_slice(&digest_slice)
+                .expect("signed message should be gotten from digest slice");
 
-        let secp = Secp256k1::new();
-    
-        RuntimeTransaction {
-            version: 0,
-            signatures: vec![Signature(secp.sign_schnorr(&sig_message, &program_keypair).serialize().to_vec())],
-            message,
-        }
-    }).collect::<Vec<RuntimeTransaction>>();
+            let secp = Secp256k1::new();
+
+            RuntimeTransaction {
+                version: 0,
+                signatures: vec![Signature(
+                    secp.sign_schnorr(&sig_message, &program_keypair)
+                        .serialize()
+                        .to_vec(),
+                )],
+                message,
+            }
+        })
+        .collect::<Vec<RuntimeTransaction>>();
 
     let txids = process_result(post_data(NODE1_ADDRESS, "send_transactions", txs))
         .expect("send_transaction should not fail")
         .as_array()
         .expect("cannot convert result to array")
         .iter()
-        .map(|r| r.as_str().expect("cannot convert object to string").to_string())
+        .map(|r| {
+            r.as_str()
+                .expect("cannot convert object to string")
+                .to_string()
+        })
         .collect::<Vec<String>>();
 
     for txid in txids {
         let _processed_tx = get_processed_transaction(NODE1_ADDRESS, txid.clone())
-        .expect("get processed transaction should not fail");
+            .expect("get processed transaction should not fail");
 
-        println!("{:?}", read_account_info(NODE1_ADDRESS, program_pubkey.clone()));
+        println!(
+            "{:?}",
+            read_account_info(NODE1_ADDRESS, program_pubkey.clone())
+        );
     }
-
-    
 
     // for tx_batch in txs.chunks(12) {
     //     let mut txids = vec![];
@@ -317,7 +333,7 @@ pub fn deploy_program_txs(
 pub fn start_key_exchange() {
     match process_result(post(NODE1_ADDRESS, "start_key_exchange")) {
         Err(err) => println!("Error starting Key Exchange: {:?}", err),
-        Ok(val) => assert!(val.as_bool().unwrap())
+        Ok(val) => assert!(val.as_bool().unwrap()),
     };
 }
 
@@ -369,7 +385,8 @@ fn get_best_block() -> String {
 /// Returns a processed transaction given the txid
 /// Keeps trying for a maximum of 60 seconds if the processed transaction is not available
 pub fn get_processed_transaction(url: &str, tx_id: String) -> Result<ProcessedTransaction> {
-    let mut processed_tx = process_get_transaction_result(post_data(url, GET_PROCESSED_TRANSACTION, tx_id.clone()));
+    let mut processed_tx =
+        process_get_transaction_result(post_data(url, GET_PROCESSED_TRANSACTION, tx_id.clone()));
     if let Err(e) = processed_tx {
         return Err(anyhow!("{}", e));
     }
@@ -378,7 +395,11 @@ pub fn get_processed_transaction(url: &str, tx_id: String) -> Result<ProcessedTr
     while let Ok(Value::Null) = processed_tx {
         println!("Processed transaction is not yet in the database. Retrying...");
         std::thread::sleep(std::time::Duration::from_secs(wait_time));
-        processed_tx = process_get_transaction_result(post_data(url, GET_PROCESSED_TRANSACTION, tx_id.clone()));
+        processed_tx = process_get_transaction_result(post_data(
+            url,
+            GET_PROCESSED_TRANSACTION,
+            tx_id.clone(),
+        ));
         wait_time += 10;
         if wait_time >= 60 {
             println!("get_processed_transaction has run for more than 60 seconds");
@@ -391,7 +412,12 @@ pub fn get_processed_transaction(url: &str, tx_id: String) -> Result<ProcessedTr
         while p["status"].as_str().unwrap() != "Processed" {
             println!("Processed transaction is not yet finalized. Retrying...");
             std::thread::sleep(std::time::Duration::from_secs(wait_time));
-            p = process_get_transaction_result(post_data(url, GET_PROCESSED_TRANSACTION, tx_id.clone())).unwrap();
+            p = process_get_transaction_result(post_data(
+                url,
+                GET_PROCESSED_TRANSACTION,
+                tx_id.clone(),
+            ))
+            .unwrap();
             wait_time += 10;
             if wait_time >= 60 {
                 println!("get_processed_transaction has run for more than 60 seconds");

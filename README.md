@@ -3,10 +3,10 @@
 This repo contains a local arch-network development stack, as well as some example programs.
 
 ## Requirements:
-- [Docker]
 - [Rust]
-- A C++ Compiler (gcc/clang)
-- [Solana CLI](#21---install-solana-cli)
+- [Docker]
+- [A C++ Compiler (gcc/clang)](#21-install-c-compiler)
+- [Solana CLI](#22---install-solana-cli)
 
 ## Getting Started
 
@@ -48,13 +48,42 @@ docker compose up
 export DOCKER_DEFAULT_PLATFORM=linux/amd64
 ```
 
+**NOTE:** Additionally, if you have an Intel chip (ie, x86_64), you may encounter the following error when executing `docker compose up`; we recommend removing the `--platform=linux/arm64` flag within [Line 1: Dockerfile]:
+
+```bash
+=> ERROR [init-bootnode 2/3] RUN set -ex && apt-get update && apt-get install -qq --no-install-recommends curl jq               0.6s
+------
+ > [init-bootnode 2/3] RUN set -ex && apt-get update && apt-get install -qq --no-install-recommends curl jq:
+0.314 exec /bin/sh: exec format error
+------
+failed to solve: process "/bin/sh -c set -ex \t&& apt-get update \t&& apt-get install -qq --no-install-recommends curl jq" did not complete successfully: exit code: 1
+```
+
 ### Initializing nodes
+If everything pulls and initializes correctly, the logs should resemble the following:
 ![](.readme_assets/docker-init.gif)
 
-## 2 - Compile and Run the `helloworld` example program
+## 2 - Compile and run the `helloworld` example program
 
-### 2.1 - Install Solana CLI
+### 2.1. Install C++ Compiler
+For MacOS users, this *should* already be installed alongside [gcc] so you can skip this section.
 
+For Linux (Debian/Ubuntu) users, this must be installed if it isn't already. We will manually install the gcc-multilib.
+```bash
+sudo apt-get update
+sudo apt-get install gcc-multilib
+```
+
+⚠️ **NOTE:** If you are a Linux user and do not already have gcc-multilib installed you will see an error like the below when trying to execute `cargo-build-sbf`.
+
+```bash
+cargo:warning=/usr/include/stdint.h:26:10: fatal error: 'bits/libc-header-start.h' file not found
+  cargo:warning=   26 | #include <bits/libc-header-start.h>
+  cargo:warning=      |          ^~~~~~~~~~~~~~~~~~~~~~~~~~
+  cargo:warning=1 error generated.
+```
+
+### 2.2 - Install Solana CLI
 To compile the examples, the [Solana] CLI toolchain must be installed. Execute the following commands to install the toolchain to your local system.
 
 #### MacOS & Linux
@@ -67,7 +96,7 @@ sh -c "$(curl -sSfL https://release.solana.com/v1.18.18/install)"
 >
 > Ref: [Solana Docs].
 
-### 2.2 - Compile and run the example program
+### 2.3 - Compile and run the example program
 - Access the `examples/helloworld/program` folder:
 ```bash
 cd examples/helloworld/program
@@ -77,7 +106,9 @@ cd examples/helloworld/program
 cargo-build-sbf
 ```
 
-> ⚠️ **NOTE:** Installing [rust] through [Homebrew] likely leads to issues working with `cargo-build-sbf`. Below are some steps to get around this.
+> ⚠️ **NOTE:** Installing [rust] through [Homebrew] likely leads to issues working with `cargo-build-sbf`. 
+>
+> Below are some steps to get around this.
 
 #### Steps:
 
@@ -112,6 +143,7 @@ cargo-build-sbf
 > If you are still experiencing errors, join our [Discord dev-chat] channel for more support.
 
 ### Build program
+If everything builds correctly, the `cargo-build-sbf` output should resemble the following:
 ![](.readme_assets/helloworld-build.gif)
 
 - This will compile the example program into a eBPF ELF file (the executable format expected by the Arch virtual machine). You'll find the generated shared object file at: `./target/deploy/helloworldprogram.so`
@@ -162,6 +194,7 @@ rustflags = [
 - [Solana Local Development Guide]
 
 
+[gcc]: https://gcc.gnu.org/
 [docs]: https://docs.arch.network
 [Rust]: https://www.rust-lang.org/
 [ebpf]: https://ebpf.io/
@@ -176,5 +209,6 @@ rustflags = [
 [Validator]: ./compose.yaml#L51
 [Discord dev-chat]: https://discord.com/channels/1241112027963986001/1270921925991989268
 [mempool.space]: https://mempool.dev.aws.archnetwork.xyz 
+[Line 1: Dockerfile]: https://github.com/Arch-Network/arch-local/blob/main/init/Dockerfile#L1
 [cargo-arch]: ./cargo-arch.sh
 
