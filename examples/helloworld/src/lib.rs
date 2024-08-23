@@ -33,6 +33,8 @@ mod tests {
     fn test_deploy_call() {
         setup();
 
+        let hello_name = "Satoshi"; // Name to be used in the Hello World program
+
         info!("Starting test_deploy_call");
         debug!(
             "u64 10044 in little-endian bytes: {:?}",
@@ -159,7 +161,7 @@ mod tests {
                     is_writable: true,
                 }],
                 data: borsh::to_vec(&HelloWorldParams {
-                    name: "arch".to_string(),
+                    name: hello_name.to_string(),
                     tx_hex: vec![],
                 })
                 .unwrap(),
