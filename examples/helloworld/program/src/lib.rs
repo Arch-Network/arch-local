@@ -1,23 +1,21 @@
 use arch_program::{
-    account::{AccountInfo},
+    account::AccountInfo,
     entrypoint,
+    helper::get_state_trasition_tx,
+    input_to_sign::InputToSign,
     instruction::Instruction,
     msg,
     program::{
-        invoke, set_return_data, get_bitcoin_tx, 
-        validate_utxo_ownership, get_network_xonly_pubkey,
-        set_transaction_to_sign, next_account_info,
-        get_account_script_pubkey
+        get_account_script_pubkey, get_bitcoin_tx, get_network_xonly_pubkey, invoke,
+        next_account_info, set_return_data, set_transaction_to_sign, validate_utxo_ownership,
     },
-    helper::get_state_trasition_tx,
-    transaction_to_sign::TransactionToSign,
     program_error::ProgramError,
-    input_to_sign::InputToSign,
     pubkey::Pubkey,
-    utxo::UtxoMeta,
     system_instruction::SystemInstruction,
+    transaction_to_sign::TransactionToSign,
+    utxo::UtxoMeta,
 };
-use borsh::{BorshSerialize, BorshDeserialize};
+use borsh::{BorshDeserialize, BorshSerialize};
 
 entrypoint!(process_instruction);
 pub fn process_instruction(
@@ -40,13 +38,17 @@ pub fn process_instruction(
     if new_data.as_bytes().len() > data_len {
         account.realloc(new_data.len(), true)?;
     }
-    
+
     let script_pubkey = get_account_script_pubkey(account.key);
     msg!("script_pubkey {:?}", script_pubkey);
 
-    account.data.try_borrow_mut().unwrap().copy_from_slice(new_data.as_bytes());
+    account
+        .data
+        .try_borrow_mut()
+        .unwrap()
+        .copy_from_slice(new_data.as_bytes());
 
-    msg!("hello");
+    msg!("Hello, {}!", params.name);
 
     Ok(())
 }
