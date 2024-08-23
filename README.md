@@ -186,7 +186,7 @@ rustflags = [
   - A shell script for creating new projects within `/examples`
   ```bash
   # usage
-  ./cargo-arch <my_project>
+  ./cargo-arch.sh <my_project>
   ```
 - [mempool.space] 
    -  Bitcoin mempool and blockchain explorer. This mempool.space instance monitors the regtest Bitcoin blockchain being used to run and validate all examples in this repo.
