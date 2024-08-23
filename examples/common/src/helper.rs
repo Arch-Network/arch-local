@@ -242,9 +242,11 @@ pub fn sign_and_send_transaction(
 
 /// Deploys the HelloWorld program using the compiled ELF
 pub fn deploy_program_txs(program_keypair: UntweakedKeypair, elf_path: &str) -> Vec<String> {
+    info!("Starting program deployment");
     let program_pubkey =
         Pubkey::from_slice(&XOnlyPublicKey::from_keypair(&program_keypair).0.serialize());
-    let elf = fs::read(elf_path).expect("elf path should be available");
+    let elf = fs::read(elf_path).expect("Failed to read ELF file");
+    info!("ELF file size: {} bytes", elf.len());
     let txs = elf
         .chunks(extend_bytes_max_len())
         .enumerate()
