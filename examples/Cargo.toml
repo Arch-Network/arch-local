@@ -2,9 +2,8 @@
 resolver = "2"
 
 members = [ 
-    #"counter", 
+    "counter", 
     "helloworld", 
-    #"counter", 
     #"bank_account", 
     "common",
 ]
