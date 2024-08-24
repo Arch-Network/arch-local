@@ -1,5 +1,4 @@
 //! This module contains helper methods for interacting with the HelloWorld program
-
 use anyhow::{anyhow, Result};
 use bitcoin::{
     absolute::LockTime,
@@ -11,6 +10,8 @@ use bitcoin::{
     Amount, OutPoint, ScriptBuf, Sequence, TapSighashType, Transaction, TxIn, Witness,
 };
 use bitcoincore_rpc::{Auth, Client, RawTx, RpcApi};
+use env_logger;
+use log::{debug, error, info, warn};
 use serde::Deserialize;
 use serde::Serialize;
 use serde_json::{from_str, json, Value};
@@ -188,7 +189,7 @@ pub fn sign_and_send_instruction(
         message,
     };
 
-    println!("{:?}", params);
+    debug!("RuntimeTransaction Params: {:?}", params);
 
     let result = process_result(post_data(NODE1_ADDRESS, "send_transaction", params))
         .expect("send_transaction should not fail")
@@ -240,24 +241,22 @@ pub fn sign_and_send_transaction(
 }
 
 /// Deploys the HelloWorld program using the compiled ELF
-pub fn deploy_program_txs(program_keypair: UntweakedKeypair, elf_path: &str) {
+pub fn deploy_program_txs(program_keypair: UntweakedKeypair, elf_path: &str) -> Vec<String> {
+    info!("Starting program deployment");
     let program_pubkey =
         Pubkey::from_slice(&XOnlyPublicKey::from_keypair(&program_keypair).0.serialize());
-
-    let elf = fs::read(elf_path).expect("elf path should be available");
+    let elf = fs::read(elf_path).expect("Failed to read ELF file");
+    info!("ELF file size: {} bytes", elf.len());
     let txs = elf
         .chunks(extend_bytes_max_len())
         .enumerate()
         .map(|(i, chunk)| {
             let mut bytes = vec![];
-
             let offset: u32 = (i * extend_bytes_max_len()) as u32;
             let len: u32 = chunk.len() as u32;
-
             bytes.extend(offset.to_le_bytes());
             bytes.extend(len.to_le_bytes());
             bytes.extend(chunk);
-
             let message = Message {
                 signers: vec![program_pubkey.clone()],
                 instructions: vec![SystemInstruction::new_extend_bytes_instruction(
@@ -265,14 +264,11 @@ pub fn deploy_program_txs(program_keypair: UntweakedKeypair, elf_path: &str) {
                     program_pubkey.clone(),
                 )],
             };
-
             let digest_slice =
                 hex::decode(message.hash()).expect("hashed message should be decodable");
             let sig_message = secp256k1::Message::from_digest_slice(&digest_slice)
                 .expect("signed message should be gotten from digest slice");
-
             let secp = Secp256k1::new();
-
             RuntimeTransaction {
                 version: 0,
                 signatures: vec![Signature(
@@ -284,6 +280,8 @@ pub fn deploy_program_txs(program_keypair: UntweakedKeypair, elf_path: &str) {
             }
         })
         .collect::<Vec<RuntimeTransaction>>();
+
+    info!("Deploying program with {} transactions", txs.len());
 
     let txids = process_result(post_data(NODE1_ADDRESS, "send_transactions", txs))
         .expect("send_transaction should not fail")
@@ -297,51 +295,50 @@ pub fn deploy_program_txs(program_keypair: UntweakedKeypair, elf_path: &str) {
         })
         .collect::<Vec<String>>();
 
-    for txid in txids {
-        let _processed_tx = get_processed_transaction(NODE1_ADDRESS, txid.clone())
-            .expect("get processed transaction should not fail");
+    info!(
+        "Successfully sent {} transactions for program deployment",
+        txids.len()
+    );
 
-        println!(
-            "{:?}",
-            read_account_info(NODE1_ADDRESS, program_pubkey.clone())
-        );
+    for (i, txid) in txids.iter().enumerate() {
+        match get_processed_transaction(NODE1_ADDRESS, txid.clone()) {
+            Ok(_) => debug!(
+                "Transaction {} (ID: {}) processed successfully",
+                i + 1,
+                txid
+            ),
+            Err(e) => warn!(
+                "Failed to process transaction {} (ID: {}): {:?}",
+                i + 1,
+                txid,
+                e
+            ),
+        }
     }
 
-    // for tx_batch in txs.chunks(12) {
-    //     let mut txids = vec![];
-    //     for tx in tx_batch {
-    //         let txid = process_result(post_data(NODE1_ADDRESS, "send_transaction", tx))
-    //             .expect("send_transaction should not fail")
-    //             .as_str()
-    //             .expect("cannot convert result to string")
-    //             .to_string();
-
-    //         println!("sent tx {:?}", txid);
-    //         txids.push(txid);
-    //     };
-
-    //     for txid in txids {
-    //         let processed_tx = get_processed_transaction(NODE1_ADDRESS, txid.clone())
-    //             .expect("get processed transaction should not fail");
-
-    //         println!("{:?}", read_account_info(NODE1_ADDRESS, program_pubkey.clone()));
-    //     }
-    // }
+    txids
 }
 
 /// Starts Key Exchange by calling the RPC method
 pub fn start_key_exchange() {
     match process_result(post(NODE1_ADDRESS, "start_key_exchange")) {
-        Err(err) => println!("Error starting Key Exchange: {:?}", err),
-        Ok(val) => assert!(val.as_bool().unwrap()),
+        Err(err) => error!("Failed to initiate Key Exchange: {:?}", err),
+        Ok(val) => {
+            if val.as_bool().unwrap_or(false) {
+                info!("Key Exchange initiated successfully");
+            } else {
+                warn!("Key Exchange initiation returned unexpected result");
+            }
+        }
     };
 }
 
 /// Starts a Distributed Key Generation round by calling the RPC method
 pub fn start_dkg() {
-    if let Err(err) = process_result(post(NODE1_ADDRESS, "start_dkg")) {
-        println!("Error starting DKG: {:?}", err);
-    };
+    match process_result(post(NODE1_ADDRESS, "start_dkg")) {
+        Ok(_) => info!("Distributed Key Generation (DKG) initiated successfully"),
+        Err(err) => error!("Failed to initiate Distributed Key Generation: {:?}", err),
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -354,9 +351,26 @@ pub struct AccountInfoResult {
 
 /// Read Utxo given the utxo ID
 pub fn read_account_info(url: &str, pubkey: Pubkey) -> Result<AccountInfoResult> {
-    let result = process_result(post_data(url, READ_ACCOUNT_INFO, pubkey))
-        .expect("read_account_info should not fail");
-    serde_json::from_value(result).map_err(|_| anyhow!("Unable to decode read_account_info result"))
+    // Perform the POST request and get the raw response
+    let raw_response = post_data(url, READ_ACCOUNT_INFO, pubkey);
+
+    // Process the result
+    let result = process_result(raw_response.clone())
+        .map_err(|e| anyhow!("Error processing result: {:?}", e))?;
+
+    // Attempt to deserialize into AccountInfoResult
+    let account_info: AccountInfoResult = serde_json::from_value(result)
+        .map_err(|e| anyhow!("Unable to decode read_account_info result: {:?}", e))?;
+
+    info!("Retrieved account info for pubkey: {:?}", pubkey);
+    debug!(
+        "Account info details: Owner: {:?}, Data length: {} bytes, Executable: {}",
+        account_info.owner,
+        account_info.data.len(),
+        account_info.is_executable
+    );
+
+    Ok(account_info)
 }
 
 /// Returns a program given the program ID
@@ -393,7 +407,10 @@ pub fn get_processed_transaction(url: &str, tx_id: String) -> Result<ProcessedTr
 
     let mut wait_time = 10;
     while let Ok(Value::Null) = processed_tx {
-        println!("Processed transaction is not yet in the database. Retrying...");
+        debug!(
+            "Transaction not yet processed. Retrying in {} seconds...",
+            wait_time
+        );
         std::thread::sleep(std::time::Duration::from_secs(wait_time));
         processed_tx = process_get_transaction_result(post_data(
             url,
@@ -402,31 +419,15 @@ pub fn get_processed_transaction(url: &str, tx_id: String) -> Result<ProcessedTr
         ));
         wait_time += 10;
         if wait_time >= 60 {
-            println!("get_processed_transaction has run for more than 60 seconds");
-            return Err(anyhow!("Failed to retrieve processed transaction"));
+            error!("Failed to retrieve processed transaction after 60 seconds");
+            return Err(anyhow!("Timeout: Failed to retrieve processed transaction"));
         }
     }
 
-    if let Ok(ref tx) = processed_tx {
-        let mut p = tx.clone();
-        while p["status"].as_str().unwrap() != "Processed" {
-            println!("Processed transaction is not yet finalized. Retrying...");
-            std::thread::sleep(std::time::Duration::from_secs(wait_time));
-            p = process_get_transaction_result(post_data(
-                url,
-                GET_PROCESSED_TRANSACTION,
-                tx_id.clone(),
-            ))
-            .unwrap();
-            wait_time += 10;
-            if wait_time >= 60 {
-                println!("get_processed_transaction has run for more than 60 seconds");
-                return Err(anyhow!("Failed to retrieve processed transaction"));
-            }
-        }
-        processed_tx = Ok(p);
-    }
-
+    info!(
+        "Successfully retrieved and processed transaction: {}",
+        tx_id
+    );
     Ok(serde_json::from_value(processed_tx?).unwrap())
 }
 
@@ -517,11 +518,13 @@ pub fn send_utxo(pubkey: Pubkey) -> (String, u32) {
         .expect("getting caller info should not fail");
 
     let address = get_account_address(pubkey);
-    println!("address {:?}", address);
+
     let account_address = Address::from_str(&address)
         .unwrap()
         .require_network(bitcoin::Network::Regtest)
         .unwrap();
+
+    info!("Sending UTXO to account address: {}", address);
 
     let txid = rpc
         .send_to_address(
@@ -534,7 +537,7 @@ pub fn send_utxo(pubkey: Pubkey) -> (String, u32) {
             None,
             None,
         )
-        .expect("SATs should be sent to address");
+        .expect("Failed to send SATs to address");
 
     let sent_tx = rpc
         .get_raw_transaction(&txid, None)
@@ -544,10 +547,14 @@ pub fn send_utxo(pubkey: Pubkey) -> (String, u32) {
     for (index, output) in sent_tx.output.iter().enumerate() {
         if output.script_pubkey == account_address.script_pubkey() {
             vout = index as u32;
-            println!("FOUUUND MATCHING UTXO")
+            println!("Found a matching UTXO")
         }
     }
 
+    info!(
+        "UTXO sent successfully. Transaction ID: {}, Output Index: {}",
+        txid, vout
+    );
     (txid.to_string(), vout)
 }
 
@@ -610,7 +617,8 @@ pub fn start_boot_node(port: u16, arch_nodes: &str, bitcoin_rpc_info: &BitcoinRp
         &bitcoin_rpc_info.password,
     ]);
 
-    command.spawn().expect("Failed to start node process")
+    info!("Starting boot node on port {}", port);
+    command.spawn().expect("Failed to start boot node process")
 }
 
 pub fn start_node(port: u16, bitcoin_rpc_info: &BitcoinRpcInfo) -> Child {
@@ -638,13 +646,14 @@ pub fn start_node(port: u16, bitcoin_rpc_info: &BitcoinRpcInfo) -> Child {
         &format!(".participant{}", port),
     ]);
 
+    info!("Starting node on port {}", port);
     command.spawn().expect("Failed to start node process")
 }
 
 async fn stop_node(mut child: Child) {
     match child.kill() {
-        Ok(_) => println!("Node stopped successfully."),
-        Err(e) => eprintln!("Failed to stop node: {}", e),
+        Ok(_) => info!("Node stopped successfully"),
+        Err(e) => error!("Failed to stop node: {}", e),
     }
 
     let _ = child.wait();

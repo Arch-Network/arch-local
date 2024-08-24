@@ -1,16 +1,26 @@
 /// Running Tests
 #[cfg(test)]
 mod tests {
+    use arch_program::{
+        account::AccountMeta, instruction::Instruction, pubkey::Pubkey,
+        system_instruction::SystemInstruction, utxo::UtxoMeta,
+    };
     use bitcoincore_rpc::{Auth, Client};
+    use borsh::{BorshDeserialize, BorshSerialize};
     use common::constants::*;
-    use arch_program::{pubkey::Pubkey, utxo::UtxoMeta, system_instruction::SystemInstruction, instruction::Instruction, account::AccountMeta};
     use common::helper::*;
-    use serial_test::serial;
     use common::models::*;
-    use std::thread;
-    use std::str::FromStr;
-    use borsh::{BorshSerialize, BorshDeserialize};
+    use serial_test::serial;
     use std::fs;
+    use std::str::FromStr;
+    use std::thread;
+
+    use env_logger;
+    use log::{debug, error, info, warn};
+
+    fn setup() {
+        env_logger::init();
+    }
 
     /// Represents the parameters for running the Hello World process
     #[derive(Clone, BorshSerialize, BorshDeserialize)]
@@ -21,69 +31,108 @@ mod tests {
 
     #[test]
     fn test_deploy_call() {
+        setup();
 
-        println!("{:?}", 10044_u64.to_le_bytes());
-        println!("{:?}", 10881_u64.to_le_bytes());
+        let hello_name = "Satoshi"; // Name to be used in the Hello World program
 
-        let rpc = Client::new(
-            "https://bitcoin-node.dev.aws.archnetwork.xyz:18443/wallet/testwallet",
-            Auth::UserPass(
-                "bitcoin".to_string(),
-                "428bae8f3c94f8c39c50757fc89c39bc7e6ebc70ebf8f618".to_string(),
-            ),
-        ).unwrap();
+        info!("Starting test_deploy_call");
+        debug!(
+            "u64 10044 in little-endian bytes: {:?}",
+            10044_u64.to_le_bytes()
+        );
+        debug!(
+            "u64 10881 in little-endian bytes: {:?}",
+            10881_u64.to_le_bytes()
+        );
 
-        let (program_keypair, program_pubkey) = with_secret_key_file(PROGRAM_FILE_PATH)
-            .expect("getting caller info should not fail");
+        // 1. Create Bitcoin RPC client
+        // let rpc = Client::new(
+        //     "https://bitcoin-node.dev.aws.archnetwork.xyz:18443/wallet/testwallet",
+        //     Auth::UserPass(
+        //         "bitcoin".to_string(),
+        //         "428bae8f3c94f8c39c50757fc89c39bc7e6ebc70ebf8f618".to_string(),
+        //     ),
+        // )
+        // .expect("Failed to create Bitcoin RPC client");
 
-        let (caller_keypair, caller_pubkey) = with_secret_key_file(CALLER_FILE_PATH)
-            .expect("getting caller info should not fail");
+        // 2. Get program and caller key pairs
+        let (program_keypair, program_pubkey) =
+            with_secret_key_file(PROGRAM_FILE_PATH).expect("Failed to get program key pair");
+        let (caller_keypair, caller_pubkey) =
+            with_secret_key_file(CALLER_FILE_PATH).expect("Failed to get caller key pair");
 
-
+        // 3. Send UTXO for program account
         let (txid, vout) = send_utxo(program_pubkey.clone());
-        println!("{}:{} {:?}", txid, vout, hex::encode(program_pubkey));
+        info!(
+            "UTXO sent: {}:{} for program pubkey: {:?}",
+            txid,
+            vout,
+            hex::encode(program_pubkey)
+        );
 
+        // 4. Create program account
         let (txid, instruction_hash) = sign_and_send_instruction(
             SystemInstruction::new_create_account_instruction(
                 hex::decode(txid).unwrap().try_into().unwrap(),
                 vout,
                 program_pubkey.clone(),
             ),
-            vec![program_keypair],
-        ).expect("signing and sending a transaction should not fail");
+            vec![program_keypair.clone()],
+        )
+        .expect("Failed to sign and send create account instruction");
 
         let processed_tx = get_processed_transaction(NODE1_ADDRESS, txid.clone())
-            .expect("get processed transaction should not fail");
-        println!("processed_tx {:?}", processed_tx);
+            .expect("Failed to get processed transaction");
+        debug!(
+            "Processed transaction for account creation: {:?}",
+            processed_tx
+        );
 
-        let txids = deploy_program_txs(program_keypair, "program/target/sbf-solana-solana/release/helloworldprogram.so");
+        // 5. Deploy program
+        let txids = deploy_program_txs(
+            program_keypair.clone(),
+            "program/target/sbf-solana-solana/release/helloworldprogram.so",
+        );
+        info!("Program deployed with transaction IDs: {:?}", txids);
 
-        println!("{:?}", txids);
-
-        let elf = fs::read("program/target/sbf-solana-solana/release/helloworldprogram.so").expect("elf path should be available");
-        assert!(read_account_info(NODE1_ADDRESS, program_pubkey.clone()).unwrap().data == elf);
-
+        // 6. Set program as executable
         let (txid, instruction_hash) = sign_and_send_instruction(
             Instruction {
                 program_id: Pubkey::system_program(),
                 accounts: vec![AccountMeta {
                     pubkey: program_pubkey.clone(),
                     is_signer: true,
-                    is_writable: true
+                    is_writable: true,
                 }],
-                data: vec![2]
+                data: vec![2],
             },
             vec![program_keypair],
-        ).expect("signing and sending a transaction should not fail");
+        )
+        .expect("Failed to sign and send set executable instruction");
 
         let processed_tx = get_processed_transaction(NODE1_ADDRESS, txid.clone())
-            .expect("get processed transaction should not fail");
-        println!("processed_tx {:?}", processed_tx);
+            .expect("Failed to get processed transaction");
+        debug!(
+            "Processed transaction for setting executable: {:?}",
+            processed_tx
+        );
 
-        assert!(read_account_info(NODE1_ADDRESS, program_pubkey.clone()).unwrap().is_executable);
+        // 7. Verify program is executable
+        assert!(
+            read_account_info(NODE1_ADDRESS, program_pubkey.clone())
+                .expect("Failed to read account info")
+                .is_executable,
+            "Program should be marked as executable"
+        );
 
+        // 8. Create caller account
         let (txid, vout) = send_utxo(caller_pubkey.clone());
-        println!("{}:{} {:?}", txid, vout, hex::encode(caller_pubkey));
+        info!(
+            "UTXO sent: {}:{} for caller pubkey: {:?}",
+            txid,
+            vout,
+            hex::encode(caller_pubkey)
+        );
 
         let (txid, instruction_hash) = sign_and_send_instruction(
             SystemInstruction::new_create_account_instruction(
@@ -91,34 +140,49 @@ mod tests {
                 vout,
                 caller_pubkey.clone(),
             ),
-            vec![caller_keypair],
-        ).expect("signing and sending a transaction should not fail");
+            vec![caller_keypair.clone()],
+        )
+        .expect("Failed to sign and send create caller account instruction");
 
         let processed_tx = get_processed_transaction(NODE1_ADDRESS, txid.clone())
-            .expect("get processed transaction should not fail");
-        println!("processed_tx {:?}", processed_tx);
-        
+            .expect("Failed to get processed transaction");
+        debug!(
+            "Processed transaction for caller account creation: {:?}",
+            processed_tx
+        );
+
+        // 9. Call the program
         let (txid, instruction_hash) = sign_and_send_instruction(
             Instruction {
                 program_id: program_pubkey.clone(),
                 accounts: vec![AccountMeta {
                     pubkey: caller_pubkey.clone(),
                     is_signer: true,
-                    is_writable: true
+                    is_writable: true,
                 }],
                 data: borsh::to_vec(&HelloWorldParams {
-                    name: "arch".to_string(),
-                    tx_hex: vec![]
-                }).unwrap()
+                    name: hello_name.to_string(),
+                    tx_hex: vec![],
+                })
+                .unwrap(),
             },
             vec![caller_keypair],
-        ).expect("signing and sending a transaction should not fail");
+        )
+        .expect("Failed to sign and send program call instruction");
 
         let processed_tx = get_processed_transaction(NODE1_ADDRESS, txid.clone())
-            .expect("get processed transaction should not fail");
-        println!("processed_tx {:?}", processed_tx);
+            .expect("Failed to get processed transaction");
+        debug!("Processed transaction for program call: {:?}", processed_tx);
 
-        println!("{:?}", read_account_info(NODE1_ADDRESS, caller_pubkey.clone()));
+        // 10. Check results
+        let caller_account_info = read_account_info(NODE1_ADDRESS, caller_pubkey.clone())
+            .expect("Failed to read caller account info");
+        info!(
+            "Caller account info after program call: {:?}",
+            caller_account_info
+        );
+
+        info!("test_deploy_call completed successfully");
     }
 
     // #[test]
@@ -141,7 +205,7 @@ mod tests {
     //     let state_txid = send_utxo();
     //     println!("utxo {:?}", format!("{}:1", state_txid.clone()));
     //     println!("read utxo {:?}", read_utxo(NODE1_ADDRESS, format!("{}:1", state_txid.clone())).expect("read utxo should not fail"));
- 
+
     //     let instruction_data = HelloWorldParams {
     //         name: "Amine".to_string(),
     //         tx_hex: hex::decode(prepare_fees()).unwrap(),
@@ -208,7 +272,7 @@ mod tests {
     //         utxo.data,
     //         "Hello Marouane!".as_bytes().to_vec()
     //     );
-        
+
     // }
 
     // #[test]

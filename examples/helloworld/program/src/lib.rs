@@ -38,7 +38,7 @@ pub fn process_instruction(
         .unwrap()
         .copy_from_slice(new_data.as_bytes());
 
-    msg!("hello");
+    msg!("Hello, {}!", params.name);
 
     Ok(())
 }
