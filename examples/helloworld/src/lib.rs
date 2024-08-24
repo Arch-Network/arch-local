@@ -151,20 +151,52 @@ mod tests {
             processed_tx
         );
 
-        // 9. Call the program
+        // 9. Assign ownership of caller account to program
+
+        let mut instruction_data = vec![3];
+        instruction_data.extend(program_pubkey.serialize());
+
+        let (txid, instruction_hash) = sign_and_send_instruction(
+            Instruction {
+                program_id: Pubkey::system_program(),
+                accounts: vec![AccountMeta {
+                    pubkey: caller_pubkey.clone(),
+                    is_signer: true,
+                    is_writable: true
+                }],
+                data: instruction_data
+            },
+            vec![caller_keypair.clone()],
+        )
+        .expect("Failed to sign and send Assign ownership of caller account instruction");
+
+        let processed_tx = get_processed_transaction(NODE1_ADDRESS, txid.clone())
+            .expect("Failed to get processed transaction");
+        debug!(
+            "Processed transaction for caller account ownership assignment: {:?}",
+            processed_tx
+        );
+
+        // 10. Verify that the program is owner of caller account
+        assert_eq!(
+            read_account_info(NODE1_ADDRESS, caller_pubkey.clone()).unwrap().owner, 
+            program_pubkey,
+            "Program should be owner of caller account"
+        );
+
+        // 12. Call the program again
         let (txid, instruction_hash) = sign_and_send_instruction(
             Instruction {
                 program_id: program_pubkey.clone(),
                 accounts: vec![AccountMeta {
                     pubkey: caller_pubkey.clone(),
                     is_signer: true,
-                    is_writable: true,
+                    is_writable: true
                 }],
                 data: borsh::to_vec(&HelloWorldParams {
                     name: hello_name.to_string(),
-                    tx_hex: vec![],
-                })
-                .unwrap(),
+                    tx_hex: hex::decode(prepare_fees()).unwrap()
+                }).unwrap()
             },
             vec![caller_keypair],
         )
@@ -180,6 +212,46 @@ mod tests {
         info!(
             "Caller account info after program call: {:?}",
             caller_account_info
+        );
+        assert_eq!(
+            caller_account_info.utxo, 
+            format!("{}:{}", processed_tx.bitcoin_txids[0], 0),
+            "Caller account utxo doesn't match bitcoin txid"
+        );
+
+        // 11. Call the program
+        let (txid, instruction_hash) = sign_and_send_instruction(
+            Instruction {
+                program_id: program_pubkey.clone(),
+                accounts: vec![AccountMeta {
+                    pubkey: caller_pubkey.clone(),
+                    is_signer: true,
+                    is_writable: true
+                }],
+                data: borsh::to_vec(&HelloWorldParams {
+                    name: hello_name.to_string(),
+                    tx_hex: hex::decode(prepare_fees()).unwrap()
+                }).unwrap()
+            },
+            vec![caller_keypair],
+        )
+        .expect("Failed to sign and send program call instruction");
+
+        let processed_tx = get_processed_transaction(NODE1_ADDRESS, txid.clone())
+            .expect("Failed to get processed transaction");
+        debug!("Processed transaction for program call: {:?}", processed_tx);
+
+        // 10. Check results
+        let caller_account_info = read_account_info(NODE1_ADDRESS, caller_pubkey.clone())
+            .expect("Failed to read caller account info");
+        info!(
+            "Caller account info after program call: {:?}",
+            caller_account_info
+        );
+        assert_eq!(
+            caller_account_info.utxo, 
+            format!("{}:{}", processed_tx.bitcoin_txids[0], 0),
+            "Caller account utxo doesn't match bitcoin txid"
         );
 
         info!("test_deploy_call completed successfully");

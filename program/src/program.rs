@@ -1,4 +1,7 @@
+use bitcoin::Transaction;
+
 use crate::instruction::Instruction;
+use crate::msg;
 use crate::program_error::ProgramError;
 use crate::stable_layout::stable_ins::StableInstruction;
 
@@ -42,8 +45,45 @@ pub fn next_account_info<'a, 'b, I: Iterator<Item = &'a AccountInfo<'b>>>(
 
 pub const MAX_TRANSACTION_TO_SIGN: usize = 1024;
 
-pub fn set_transaction_to_sign(transaction_to_sign: TransactionToSign) {
-    unsafe { crate::syscalls::arch_set_transaction_to_sign(&transaction_to_sign) };
+pub fn set_transaction_to_sign(
+    accounts: &[AccountInfo],
+    transaction_to_sign: TransactionToSign,
+) -> ProgramResult {
+    let serialized_transaction_to_sign = &transaction_to_sign.serialise();
+    let result = unsafe {
+        crate::syscalls::arch_set_transaction_to_sign(
+            serialized_transaction_to_sign.as_ptr(),
+            serialized_transaction_to_sign.len() as u64,
+        )
+    };
+    match result {
+        crate::entrypoint::SUCCESS => {
+            let tx: Transaction = bitcoin::consensus::deserialize(transaction_to_sign.tx_bytes)
+                .expect("failed to deserialize tx_bytes");
+            for (index, account) in accounts
+                .iter()
+                .filter(|account| account.is_writable)
+                .enumerate()
+            {
+                msg!("tx {}", hex::encode(bitcoin::consensus::serialize(&tx)));
+                msg!("txid1 {}", tx.txid().to_string());
+                msg!(
+                    "txid2 {}",
+                    hex::encode(bitcoin::consensus::serialize(&tx.txid()))
+                );
+
+                account.set_utxo(&UtxoMeta::from(
+                    hex::decode(tx.txid().to_string())
+                        .expect("failed to decode_hex")
+                        .try_into()
+                        .expect("failed to try_into"),
+                    index as u32,
+                ));
+            }
+            Ok(())
+        }
+        _ => Err(result.into()),
+    }
 }
 
 /// Maximum size that can be set using [`set_return_data`].
