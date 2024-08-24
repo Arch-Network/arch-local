@@ -1,25 +1,15 @@
 use arch_program::{
     account::AccountInfo,
-    entrypoint,
-    helper::get_state_trasition_tx,
-    input_to_sign::InputToSign,
-    instruction::Instruction,
-    msg,
-    program::{
-        get_account_script_pubkey, get_bitcoin_tx, get_network_xonly_pubkey, invoke,
-        next_account_info, set_return_data, set_transaction_to_sign, validate_utxo_ownership,
-    },
+    entrypoint, msg,
+    program::{get_account_script_pubkey, next_account_info},
     program_error::ProgramError,
     pubkey::Pubkey,
-    system_instruction::SystemInstruction,
-    transaction_to_sign::TransactionToSign,
-    utxo::UtxoMeta,
 };
 use borsh::{BorshDeserialize, BorshSerialize};
 
 entrypoint!(process_instruction);
 pub fn process_instruction(
-    program_id: &Pubkey,
+    _program_id: &Pubkey,
     accounts: &[AccountInfo],
     instruction_data: &[u8],
 ) -> Result<(), ProgramError> {
