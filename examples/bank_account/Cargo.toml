@@ -1,27 +1,23 @@
-[workspace]
-members = [
-    "program",
-]
-
 [package]
 name = "bank_account"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-db-core = { path = "../../db_core" }
 common = { path = "../common" }
-sdk = { path = "../../sdk" }
-
+arch_program = { path = "../../program" }
 bitcoincore-rpc = "0.18.0"
 hex = "0.4.3"
 borsh = { version = "1.4.0", features = ["derive"] }
+bitcoin = { version = "0.31.0", features = ["serde", "rand"] }
+log = "0.4"
+env_logger = "0.10"
+serial_test = "3.1.1"
+solana-sdk = "1.0.1"
 
-[build-dependencies]
-risc0-build = { version = "0.21.0" }
+[features]
+test-bpf = []
 
 [dev-dependencies]
 serial_test = "3.1.1"
-
-[package.metadata.risc0]
-methods = ["program"]
+solana-program-test = "1.0.1"

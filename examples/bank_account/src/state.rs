@@ -1,5 +1,4 @@
 //! This module represents states for the running processes
-
 use anyhow::{anyhow, Result};
 use bitcoin::{
     self,

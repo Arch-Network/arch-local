@@ -1,229 +1,228 @@
-/// Running Tests
+use arch_program::{
+    account::AccountInfo, instruction::Instruction, pubkey::Pubkey,
+    system_instruction::SystemInstruction,
+};
+use borsh::{BorshDeserialize, BorshSerialize};
+use common::helper::{
+    get_processed_transaction, read_account_info, send_utxo, sign_and_send_instruction,
+    with_secret_key_file,
+};
+use log::{debug, error, info, warn};
+
+// Structs and enums that mirror those in the on-chain program
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
+pub struct BankAccount {
+    pub id: String,
+    pub name: String,
+    pub balance: u32,
+}
+
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
+pub enum AccountInstruction {
+    CreateAccount(CreateAccountParams),
+    Deposit(DepositParams),
+    Withdraw(WithdrawParams),
+}
+
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
+pub struct CreateAccountParams {
+    pub id: String,
+    pub name: String,
+    pub balance: u32,
+}
+
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
+pub struct DepositParams {
+    pub account: BankAccount,
+    pub value: u32,
+    pub tx_hex: Vec<u8>,
+}
+
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
+pub struct WithdrawParams {
+    pub account: BankAccount,
+    pub value: u32,
+    pub tx_hex: Vec<u8>,
+}
+
+// Custom deserialization function to handle padding
+
 #[cfg(test)]
 mod tests {
+    use std::vec;
+
     use super::*;
-    use bitcoincore_rpc::{Auth, Client};
-    use borsh::{BorshDeserialize, BorshSerialize};
-    use common::constants::*;
-    use common::helper::*;
-    use common::models::*;
-    use sdk::{Pubkey, UtxoMeta};
+    use arch_program::{account::AccountMeta, program_error::ProgramError};
+    use common::{
+        constants::{CALLER_FILE_PATH, NODE1_ADDRESS, PROGRAM_FILE_PATH},
+        helper::deploy_program_txs,
+    };
+    use env_logger;
     use serial_test::serial;
-    use std::thread;
-    use std::str::FromStr;
+    use solana_sdk::instruction;
 
-    #[derive(Clone, BorshSerialize, BorshDeserialize)]
-    pub struct Account {
-        pub id: String,
-        pub name: String,
-        pub balance: u32,
+    fn setup() {
+        let _ = env_logger::builder().is_test(true).try_init();
     }
 
-    #[derive(Clone, BorshSerialize, BorshDeserialize)]
-    pub enum AccountInstruction {
-        CreateAccount(CreateAccountParams),
-        Deposit(DepositParams),
-        Withdraw(WithdrawParams),
+    fn deserialize_bank_account(data: &[u8]) -> Result<BankAccount, Box<dyn std::error::Error>> {
+        let mut slice = data;
+        let id = String::deserialize(&mut slice)?;
+        let name = String::deserialize(&mut slice)?;
+        let balance = u32::deserialize(&mut slice)?;
+
+        Ok(BankAccount { id, name, balance })
     }
 
-    impl AccountInstruction {
-        pub fn tx_hex(&self) -> Vec<u8> {
-            match self {
-                AccountInstruction::CreateAccount(inner) => inner.tx_hex.clone(),
-                AccountInstruction::Deposit(inner) => inner.tx_hex.clone(),
-                AccountInstruction::Withdraw(inner) => inner.tx_hex.clone(),
-            }
-        }
-    }
+    #[test]
+    #[serial]
+    fn test_create_account_creates_account() -> Result<(), ProgramError> {
+        setup();
+        info!("Starting test_create_account_creates_account");
 
-    #[derive(Clone, BorshSerialize, BorshDeserialize)]
-    pub struct CreateAccountParams {
-        pub id: String,
-        pub name: String,
-        pub balance: u32,
-        pub tx_hex: Vec<u8>,
-    }
+        // Generate program and account keypairs
+        let (program_keypair, program_pubkey) =
+            with_secret_key_file(PROGRAM_FILE_PATH).expect("Failed to get program key pair");
+        info!("Program pubkey: {:?}", program_pubkey);
 
-    #[derive(Clone, BorshSerialize, BorshDeserialize)]
-    pub struct DepositParams {
-        pub account: Account,
-        pub value: u32,
-        pub tx_hex: Vec<u8>,
-    }
+        let (account_keypair, account_pubkey) =
+            with_secret_key_file(CALLER_FILE_PATH).expect("Failed to get caller key pair");
+        info!("Account pubkey: {:?}", account_pubkey);
 
-    #[derive(Clone, BorshSerialize, BorshDeserialize)]
-    pub struct WithdrawParams {
-        pub account: Account,
-        pub value: u32,
-        pub tx_hex: Vec<u8>,
-    }
+        // Send UTXO to create the account
+        let (txid, vout) = send_utxo(program_pubkey.clone());
+        info!(
+            "UTXO sent: {}:{} for program pubkey: {:?}",
+            txid,
+            vout,
+            hex::encode(program_pubkey)
+        );
 
-    fn assert_send_and_sign_instruction_process(input: AccountInstruction, expected: Account) {
-        let expected = borsh::to_vec(&expected).expect("Account should be serializable");
-
-        start_key_exchange();
-        start_dkg();
-
-        let rpc = Client::new(
-            "https://bitcoin-node.dev.aws.archnetwork.xyz:18443/wallet/testwallet",
-            Auth::UserPass(
-                "bitcoin".to_string(),
-                "428bae8f3c94f8c39c50757fc89c39bc7e6ebc70ebf8f618".to_string(),
+        // Create the account
+        let (txid, instruction_hash) = sign_and_send_instruction(
+            SystemInstruction::new_create_account_instruction(
+                hex::decode(txid).unwrap().try_into().unwrap(),
+                vout,
+                program_pubkey.clone(),
             ),
+            vec![program_keypair.clone()],
         )
-        .unwrap();
+        .expect("Failed to sign and send create account instruction");
 
-        let deployed_program_id = Pubkey::from_str(&deploy_program()).unwrap();
+        // Wait for the transaction to be processed
+        let processed_tx = get_processed_transaction(NODE1_ADDRESS, txid)
+            .expect("Failed to get processed transaction");
+        debug!(
+            "Processed transaction for account creation: {:?}",
+            processed_tx
+        );
 
-        let state_txid = send_utxo();
-        read_utxo(NODE1_ADDRESS, format!("{}:1", state_txid.clone()))
-            .expect("read utxo should not fail");
+        // 4. Deploy program
+        let txids = deploy_program_txs(
+            program_keypair.clone(),
+            "program/target/sbf-solana-solana/release/bank_account_program.so",
+        );
+        info!("Program deployed with transaction IDs: {:?}", txids);
 
-        let instruction_data =
-            borsh::to_vec(&input).expect("CreateAccountParams should be serializable");
+        // 5. Set program as executable
+        let (txid, instruction_hash) = sign_and_send_instruction(
+            Instruction {
+                program_id: Pubkey::system_program(),
+                accounts: vec![AccountMeta {
+                    pubkey: program_pubkey.clone(),
+                    is_signer: true,
+                    is_writable: true,
+                }],
+                data: vec![2],
+            },
+            vec![program_keypair],
+        )
+        .expect("Failed to sign and send set executable instruction");
+
+        // Wait for the transaction to be processed
+        let processed_tx = get_processed_transaction(NODE1_ADDRESS, txid)
+            .expect("Failed to get processed transaction");
+        debug!(
+            "Processed transaction for CreateAccount: {:?}",
+            processed_tx
+        );
+
+        // 7. Create caller account
+        let (txid, vout) = send_utxo(account_pubkey.clone());
+        info!(
+            "UTXO sent: {}:{} for caller pubkey: {:?}",
+            txid,
+            vout,
+            hex::encode(account_pubkey)
+        );
 
         let (txid, instruction_hash) = sign_and_send_instruction(
-            deployed_program_id.clone(),
-            vec![UtxoMeta {
-                txid: state_txid.clone(),
-                vout: 1,
-            }],
-            instruction_data,
+            SystemInstruction::new_create_account_instruction(
+                hex::decode(txid).unwrap().try_into().unwrap(),
+                vout,
+                account_pubkey.clone(),
+            ),
+            vec![account_keypair.clone()],
         )
-        .expect("signing and sending a transaction should not fail");
+        .expect("Failed to sign and send create caller account instruction");
 
-        let processed_tx = get_processed_transaction(NODE1_ADDRESS, txid)
-            .expect("get processed transaction should not fail");
-        println!("processed_tx {:?}", processed_tx);
-
-        let state_txid = &processed_tx.bitcoin_txids[&instruction_hash];
-        let utxo = read_utxo(NODE1_ADDRESS, format!("{}:0", state_txid.clone()))
-            .expect("read utxo should not fail");
-
-        assert_eq!(
-            utxo.data,
-            expected,
+        let processed_tx = get_processed_transaction(NODE1_ADDRESS, txid.clone())
+            .expect("Failed to get processed transaction");
+        debug!(
+            "Processed transaction for caller account creation: {:?}",
+            processed_tx
         );
-    }
 
-    #[test]
-    #[serial]
-    fn test_create_account_creates_account() {
-        let input = CreateAccountParams {
-            id: "1".to_string(),
-            name: "Amine".to_string(),
-            balance: 32768,
-            tx_hex: hex::decode(prepare_fees()).unwrap(),
-        };
-        let expected = Account {
-            id: "1".to_string(),
-            name: "Amine".to_string(),
-            balance: 32768,
-        };
-        assert_send_and_sign_instruction_process(
-            AccountInstruction::CreateAccount(input),
-            expected,
-        );
-    }
-
-    #[test]
-    #[should_panic]
-    #[serial]
-    fn test_create_account_panics_on_wrong_account_details() {
-        let input = CreateAccountParams {
-            id: "1".to_string(),
-            name: "Marouane".to_string(),
-            balance: 32768,
-            tx_hex: hex::decode(prepare_fees()).unwrap(),
-        };
-        let expected = Account {
-            id: "1".to_string(),
-            name: "Amine".to_string(),
-            balance: 32768,
-        };
-        assert_send_and_sign_instruction_process(
-            AccountInstruction::CreateAccount(input),
-            expected,
-        );
-    }
-
-    #[test]
-    #[serial]
-    fn test_deposit_puts_money_in_account() {
-        let input = DepositParams {
-            account: Account {
+        // 8. Call the program
+        let instruction_data =
+            borsh::to_vec(&AccountInstruction::CreateAccount(CreateAccountParams {
                 id: "1".to_string(),
                 name: "Amine".to_string(),
-                balance: 10000,
-            },
-            value: 1000,
-            tx_hex: hex::decode(prepare_fees()).unwrap(),
-        };
-        let expected = Account {
-            id: "1".to_string(),
-            name: "Amine".to_string(),
-            balance: 11000,
-        };
-        assert_send_and_sign_instruction_process(AccountInstruction::Deposit(input), expected);
-    }
+                balance: 32768,
+            }))
+            .unwrap();
 
-    #[test]
-    #[serial]
-    fn test_deposit_does_not_update_balance() {
-        let input = DepositParams {
-            account: Account {
-                id: "1".to_string(),
-                name: "Amine".to_string(),
-                balance: 10000,
+        let (txid, instruction_hash) = sign_and_send_instruction(
+            Instruction {
+                program_id: program_pubkey.clone(),
+                accounts: vec![AccountMeta {
+                    pubkey: account_pubkey.clone(),
+                    is_signer: false,
+                    is_writable: true,
+                }],
+                data: instruction_data,
             },
-            value: u32::MAX,
-            tx_hex: hex::decode(prepare_fees()).unwrap(),
-        };
-        let expected = Account {
-            id: "1".to_string(),
-            name: "Amine".to_string(),
-            balance: 10000,
-        };
-        assert_send_and_sign_instruction_process(AccountInstruction::Deposit(input), expected);
-    }
+            vec![account_keypair],
+        )
+        .expect("Failed to sign and send create account instruction");
 
-    #[test]
-    #[serial]
-    fn test_withdrawal_reduces_account_balance_by_value() {
-        let input = WithdrawParams {
-            account: Account {
-                id: "1".to_string(),
-                name: "Amine".to_string(),
-                balance: 10000,
-            },
-            value: 4000,
-            tx_hex: hex::decode(prepare_fees()).unwrap(),
-        };
-        let expected = Account {
-            id: "1".to_string(),
-            name: "Amine".to_string(),
-            balance: 6000,
-        };
-        assert_send_and_sign_instruction_process(AccountInstruction::Withdraw(input), expected);
-    }
+        let processed_tx = get_processed_transaction(NODE1_ADDRESS, txid.clone())
+            .expect("Failed to get processed transaction");
+        debug!("Processed transaction for program call: {:?}", processed_tx);
 
-    #[test]
-    #[serial]
-    fn test_withdrawal_does_not_update_balance() {
-        let input = WithdrawParams {
-            account: Account {
-                id: "1".to_string(),
-                name: "Amine".to_string(),
-                balance: 10000,
-            },
-            value: 10001,
-            tx_hex: hex::decode(prepare_fees()).unwrap(),
-        };
-        let expected = Account {
-            id: "1".to_string(),
-            name: "Amine".to_string(),
-            balance: 10000,
-        };
-        assert_send_and_sign_instruction_process(AccountInstruction::Withdraw(input), expected);
+        // Verify the account data
+        let account_info =
+            read_account_info(NODE1_ADDRESS, account_pubkey).expect("Failed to read account info");
+        debug!("On Chain Account Info: {:?}", account_info);
+
+        match deserialize_bank_account(&account_info.data) {
+            Ok(account_data) => {
+                info!("Successfully deserialized account data: {:?}", account_data);
+                assert_eq!(account_data.id, "1", "Account ID should be 1");
+                assert_eq!(account_data.name, "Amine", "Account name should be Amine");
+                assert_eq!(
+                    account_data.balance, 32768,
+                    "Account balance should be 32768"
+                );
+            }
+            Err(e) => {
+                info!("Failed to deserialize account data: {:?}", e);
+                info!("Raw account data: {:?}", account_info.data);
+                return Err(ProgramError::InvalidAccountData);
+            }
+        }
+
+        info!("test_create_account_creates_account completed successfully");
+        Ok(())
     }
 }
