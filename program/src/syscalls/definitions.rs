@@ -1,6 +1,6 @@
 #![allow(improper_ctypes)]
 
-use crate::{pubkey::Pubkey, transaction_to_sign::TransactionToSign, utxo::UtxoMeta};
+use crate::{pubkey::Pubkey, utxo::UtxoMeta};
 
 macro_rules! define_syscall {
 	(fn $name:ident($($arg:ident: $typ:ty),*) -> $ret:ty) => {
@@ -17,7 +17,7 @@ define_syscall!(fn sol_invoke_signed_rust(instruction_addr: *const u8, account_i
 define_syscall!(fn sol_set_return_data(data: *const u8, length: u64));
 define_syscall!(fn sol_get_return_data(data: *mut u8, length: u64, program_id: *mut Pubkey) -> u64);
 
-define_syscall!(fn arch_set_transaction_to_sign(transaction_to_sign: *const TransactionToSign));
+define_syscall!(fn arch_set_transaction_to_sign(transaction_to_sign: *const u8, length: u64) -> u64);
 define_syscall!(fn arch_get_bitcoin_tx(data: *mut u8, length: u64, txid: &[u8; 32]) -> u64);
 define_syscall!(fn arch_get_network_xonly_pubkey(data: *mut u8) -> u64);
 define_syscall!(fn arch_validate_utxo_ownership(utxo: *const UtxoMeta, owner: *const Pubkey) -> u64);

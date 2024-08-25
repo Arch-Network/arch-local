@@ -31,9 +31,7 @@ impl ProcessedTransaction {
 
         serialized.extend((self.bitcoin_txids.len() as u64).to_le_bytes());
         for bitcoin_txid in &self.bitcoin_txids {
-            serialized.extend(
-                hex::decode(bitcoin_txid)?,
-            );
+            serialized.extend(hex::decode(bitcoin_txid)?);
         }
         Ok(serialized)
     }
