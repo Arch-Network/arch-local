@@ -18,7 +18,7 @@ services:
 
   leader:
     platform: linux/amd64
-    build: ./docker/validator
+    image: ghcr.io/arch-network/validator:latest
     ports:
       - 19002:19002
       - 9002:9002
@@ -50,7 +50,7 @@ services:
 
   validator-1:
     platform: linux/amd64
-    build: ./docker/validator
+    image: ghcr.io/arch-network/validator:latest
     ports:
       - 19003:19003
       - 9003:9003
@@ -82,7 +82,7 @@ services:
 
   validator-2:
     platform: linux/amd64
-    build: ./docker/validator
+    image: ghcr.io/arch-network/validator:latest
     ports:
       - 19004:19004
       - 9004:9004
