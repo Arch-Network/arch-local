@@ -24,10 +24,12 @@ pub struct CreateAccountParams {
 
 #[derive(BorshSerialize, BorshDeserialize, Debug)]
 pub struct DepositParams {
+    pub account: BankAccount,
     pub value: u32,
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Debug)]
 pub struct WithdrawParams {
+    pub account: BankAccount,
     pub value: u32,
 }

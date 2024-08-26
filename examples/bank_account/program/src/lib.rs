@@ -39,6 +39,11 @@ pub fn process_instruction(
     }
 }
 
+fn io_error_to_program_error(e: std::io::Error) -> ProgramError {
+    msg!("Deserialization error: {}", e);
+    ProgramError::InvalidAccountData
+}
+
 fn create_account(account: &AccountInfo, params: CreateAccountParams) -> Result<(), ProgramError> {
     msg!("Creating account with params: {:?}", params);
 
@@ -90,10 +95,31 @@ fn withdraw(account: &AccountInfo, params: WithdrawParams) -> Result<(), Program
 }
 
 fn deserialize_bank_account(account: &AccountInfo) -> Result<BankAccount, ProgramError> {
-    borsh::from_slice(&account.data.borrow()).map_err(|e| {
-        msg!("Failed to deserialize account data: {}", e);
-        ProgramError::InvalidAccountData
-    })
+    let data = account.data.borrow();
+    msg!("Raw account data ({}): {:?}", data.len(), data);
+
+    if data.is_empty() {
+        msg!("Account data is empty");
+        return Err(ProgramError::InvalidAccountData);
+    }
+
+    let mut slice: &[u8] = &data;
+
+    let id = String::deserialize(&mut slice).map_err(io_error_to_program_error)?;
+    msg!("Deserialized id: {}", id);
+
+    let name = String::deserialize(&mut slice).map_err(io_error_to_program_error)?;
+    msg!("Deserialized name: {}", name);
+
+    let balance = u32::deserialize(&mut slice).map_err(io_error_to_program_error)?;
+    msg!("Deserialized balance: {}", balance);
+
+    // Log any remaining bytes, but don't treat it as an error
+    if !slice.is_empty() {
+        msg!("{} bytes remaining after deserialization", slice.len());
+    }
+
+    Ok(BankAccount { id, name, balance })
 }
 
 fn serialize_and_store_bank_account(
