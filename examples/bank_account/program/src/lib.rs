@@ -11,11 +11,6 @@ use models::{AccountInstruction, BankAccount, CreateAccountParams, DepositParams
 
 entrypoint!(process_instruction);
 
-// Helper function to convert std::io::Error to ProgramError
-fn io_error_to_program_error(e: std::io::Error) -> ProgramError {
-    ProgramError::Custom(e.raw_os_error().unwrap_or(0) as u32)
-}
-
 pub fn process_instruction(
     program_id: &Pubkey,
     accounts: &[AccountInfo],
@@ -23,8 +18,8 @@ pub fn process_instruction(
 ) -> Result<(), ProgramError> {
     msg!("Bank Account program entered");
 
-    // Verify we have the correct number of accounts
     if accounts.len() != 1 {
+        msg!("Error: Invalid number of accounts");
         return Err(ProgramError::InvalidAccountData);
     }
 
@@ -32,84 +27,107 @@ pub fn process_instruction(
     let account = next_account_info(account_iter)?;
     msg!("Account pubkey: {:?}", account.key);
 
-    // Deserialize the instruction
     let instruction: AccountInstruction = borsh::from_slice(instruction_data).map_err(|e| {
         msg!("Failed to deserialize instruction: {}", e);
         ProgramError::InvalidInstructionData
     })?;
 
-    // Process the instruction
     match instruction {
-        AccountInstruction::CreateAccount(params) => {
-            // if account.owner != &Pubkey::system_program() {
-            //     return Err(ProgramError::InvalidAccountData);
-            // }
+        AccountInstruction::CreateAccount(params) => create_account(account, params),
+        AccountInstruction::Deposit(params) => deposit(account, params),
+        AccountInstruction::Withdraw(params) => withdraw(account, params),
+    }
+}
 
-            // Debug params
-            msg!("Creating account with params: {:?}", params);
+fn create_account(account: &AccountInfo, params: CreateAccountParams) -> Result<(), ProgramError> {
+    msg!("Creating account with params: {:?}", params);
 
-            // Create a new BankAccount
-            let bank_account = BankAccount {
-                id: params.id,
-                name: params.name,
-                balance: params.balance,
-            };
+    let bank_account = BankAccount {
+        id: params.id,
+        name: params.name,
+        balance: params.balance,
+    };
 
-            let serialized_data = borsh::to_vec(&bank_account).map_err(|e| {
-                msg!("Failed to serialize account data: {}", e);
-                ProgramError::AccountDataTooSmall
-            })?;
+    let serialized_data = borsh::to_vec(&bank_account).map_err(|e| {
+        msg!("Failed to serialize account data: {}", e);
+        ProgramError::InvalidAccountData
+    })?;
 
-            // Check if the account has enough space
-            if account.data_len() < serialized_data.len() {
-                msg!("Account data too small");
-                return Err(ProgramError::AccountDataTooSmall);
-            }
+    msg!("Serialized data length: {}", serialized_data.len());
+    msg!("Current account data length: {}", account.data_len());
 
-            account.data.borrow_mut()[..serialized_data.len()].copy_from_slice(&serialized_data);
-        }
-        AccountInstruction::Deposit(params) => {
-            // Deserialize the existing BankAccount from AccountInfo's data
-            let mut bank_account: BankAccount =
-                borsh::from_slice(&account.data.borrow()).map_err(|e| {
-                    msg!("Failed to deserialize account data: {}", e);
-                    ProgramError::InvalidAccountData
-                })?;
+    ensure_account_size(account, serialized_data.len())?;
 
-            // Process deposit
-            bank_account.balance = bank_account
-                .balance
-                .checked_add(params.value)
-                .ok_or(ProgramError::ArithmeticOverflow)?;
+    account.data.borrow_mut()[..serialized_data.len()].copy_from_slice(&serialized_data);
+    msg!("Account created successfully");
+    Ok(())
+}
 
-            // Serialize and store the updated BankAccount
-            borsh::to_writer(&mut *account.data.borrow_mut(), &bank_account).map_err(|e| {
-                msg!("Failed to serialize account data: {}", e);
-                ProgramError::AccountDataTooSmall
-            })?;
-        }
-        AccountInstruction::Withdraw(params) => {
-            // Deserialize the existing BankAccount from AccountInfo's data
-            let mut bank_account: BankAccount =
-                borsh::from_slice(&account.data.borrow()).map_err(|e| {
-                    msg!("Failed to deserialize account data: {}", e);
-                    ProgramError::InvalidAccountData
-                })?;
+fn deposit(account: &AccountInfo, params: DepositParams) -> Result<(), ProgramError> {
+    let mut bank_account: BankAccount = deserialize_bank_account(account)?;
 
-            // Process withdrawal
-            bank_account.balance = bank_account
-                .balance
-                .checked_sub(params.value)
-                .ok_or(ProgramError::InsufficientFunds)?;
+    bank_account.balance = bank_account
+        .balance
+        .checked_add(params.value)
+        .ok_or(ProgramError::ArithmeticOverflow)?;
 
-            // Serialize and store the updated BankAccount
-            borsh::to_writer(&mut *account.data.borrow_mut(), &bank_account).map_err(|e| {
-                msg!("Failed to serialize account data: {}", e);
-                ProgramError::AccountDataTooSmall
-            })?;
-        }
+    serialize_and_store_bank_account(account, &bank_account)?;
+    msg!("Deposit processed successfully");
+    Ok(())
+}
+
+fn withdraw(account: &AccountInfo, params: WithdrawParams) -> Result<(), ProgramError> {
+    let mut bank_account: BankAccount = deserialize_bank_account(account)?;
+
+    bank_account.balance = bank_account
+        .balance
+        .checked_sub(params.value)
+        .ok_or(ProgramError::InsufficientFunds)?;
+
+    serialize_and_store_bank_account(account, &bank_account)?;
+    msg!("Withdrawal processed successfully");
+    Ok(())
+}
+
+fn deserialize_bank_account(account: &AccountInfo) -> Result<BankAccount, ProgramError> {
+    borsh::from_slice(&account.data.borrow()).map_err(|e| {
+        msg!("Failed to deserialize account data: {}", e);
+        ProgramError::InvalidAccountData
+    })
+}
+
+fn serialize_and_store_bank_account(
+    account: &AccountInfo,
+    bank_account: &BankAccount,
+) -> Result<(), ProgramError> {
+    let serialized_data = borsh::to_vec(bank_account).map_err(|e| {
+        msg!("Failed to serialize account data: {}", e);
+        ProgramError::InvalidAccountData
+    })?;
+
+    ensure_account_size(account, serialized_data.len())?;
+
+    account.data.borrow_mut()[..serialized_data.len()].copy_from_slice(&serialized_data);
+    Ok(())
+}
+
+fn ensure_account_size(account: &AccountInfo, required_size: usize) -> Result<(), ProgramError> {
+    let current_size = account.data_len();
+    msg!(
+        "Current account size: {}, Required size: {}",
+        current_size,
+        required_size
+    );
+
+    if current_size < required_size {
+        msg!(
+            "Resizing account from {} to {} bytes",
+            current_size,
+            required_size
+        );
+        account.realloc(required_size, false)?;
+        msg!("Account resized successfully");
     }
 
-    msg!("Instruction processed successfully");
     Ok(())
 }

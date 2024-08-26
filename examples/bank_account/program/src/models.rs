@@ -19,6 +19,7 @@ pub struct CreateAccountParams {
     pub id: String,
     pub name: String,
     pub balance: u32,
+    // pub tx_hex: Vec<u8>,
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Debug)]

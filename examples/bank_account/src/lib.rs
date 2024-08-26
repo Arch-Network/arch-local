@@ -15,6 +15,7 @@ pub struct BankAccount {
     pub id: String,
     pub name: String,
     pub balance: u32,
+    // pub tx_hex: Vec<u8>,
 }
 
 #[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
@@ -29,6 +30,7 @@ pub struct CreateAccountParams {
     pub id: String,
     pub name: String,
     pub balance: u32,
+    // pub tx_hex: Vec<u8>,
 }
 
 #[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
@@ -55,7 +57,7 @@ mod tests {
     use arch_program::{account::AccountMeta, program_error::ProgramError};
     use common::{
         constants::{CALLER_FILE_PATH, NODE1_ADDRESS, PROGRAM_FILE_PATH},
-        helper::deploy_program_txs,
+        helper::{deploy_program_txs, prepare_fees},
     };
     use env_logger;
     use serial_test::serial;
@@ -70,8 +72,14 @@ mod tests {
         let id = String::deserialize(&mut slice)?;
         let name = String::deserialize(&mut slice)?;
         let balance = u32::deserialize(&mut slice)?;
+        // let tx_hex = Vec::deserialize(&mut slice)?;
 
-        Ok(BankAccount { id, name, balance })
+        Ok(BankAccount {
+            id,
+            name,
+            balance,
+            // tx_hex,
+        })
     }
 
     #[test]
@@ -174,11 +182,36 @@ mod tests {
         );
 
         // 8. Call the program
+        let bank_account = BankAccount {
+            id: "1".to_string(),
+            name: "Amine".to_string(),
+            balance: 32768,
+            // tx_hex: hex::decode(prepare_fees()).unwrap(),
+        };
+        let required_space = borsh::to_vec(&bank_account).unwrap().len();
+
+        let (txid, instruction_hash) = sign_and_send_instruction(
+            SystemInstruction::new_extend_bytes_instruction(
+                vec![0; required_space],
+                account_pubkey.clone(),
+            ),
+            vec![account_keypair.clone()],
+        )
+        .expect("Failed to sign and send extend bytes instruction");
+
+        let processed_tx = get_processed_transaction(NODE1_ADDRESS, txid.clone())
+            .expect("Failed to get processed transaction");
+        debug!(
+            "Processed transaction for account resizing: {:?}",
+            processed_tx
+        );
+
         let instruction_data =
             borsh::to_vec(&AccountInstruction::CreateAccount(CreateAccountParams {
                 id: "1".to_string(),
                 name: "Amine".to_string(),
                 balance: 32768,
+                // tx_hex: hex::decode(prepare_fees()).unwrap(),
             }))
             .unwrap();
 
