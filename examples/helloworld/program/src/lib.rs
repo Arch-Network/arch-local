@@ -1,24 +1,22 @@
 use arch_program::{
-    account::{AccountInfo},
+    account::AccountInfo,
     entrypoint,
+    helper::get_state_transition_tx,
+    input_to_sign::InputToSign,
     instruction::Instruction,
     msg,
     program::{
-        invoke, set_return_data, get_bitcoin_tx, 
-        validate_utxo_ownership, get_network_xonly_pubkey,
-        set_transaction_to_sign, next_account_info,
-        get_account_script_pubkey
+        get_account_script_pubkey, get_bitcoin_tx, get_network_xonly_pubkey, invoke,
+        next_account_info, set_return_data, set_transaction_to_sign, validate_utxo_ownership,
     },
-    helper::get_state_trasition_tx,
-    transaction_to_sign::TransactionToSign,
     program_error::ProgramError,
-    input_to_sign::InputToSign,
     pubkey::Pubkey,
-    utxo::UtxoMeta,
     system_instruction::SystemInstruction,
+    transaction_to_sign::TransactionToSign,
+    utxo::UtxoMeta,
 };
-use borsh::{BorshSerialize, BorshDeserialize};
 use bitcoin::{self, Transaction};
+use borsh::{BorshDeserialize, BorshSerialize};
 
 entrypoint!(process_instruction);
 pub fn process_instruction(
@@ -46,17 +44,21 @@ pub fn process_instruction(
     let script_pubkey = get_account_script_pubkey(account.key);
     msg!("script_pubkey {:?}", script_pubkey);
 
-    account.data.try_borrow_mut().unwrap().copy_from_slice(new_data.as_bytes());
+    account
+        .data
+        .try_borrow_mut()
+        .unwrap()
+        .copy_from_slice(new_data.as_bytes());
 
-    let mut tx = get_state_trasition_tx(accounts);
+    let mut tx = get_state_transition_tx(accounts);
     tx.input.push(fees_tx.input[0].clone());
 
     let tx_to_sign = TransactionToSign {
         tx_bytes: &bitcoin::consensus::serialize(&tx),
         inputs_to_sign: &[InputToSign {
             index: 0,
-            signer: account.key.clone()
-        }]
+            signer: account.key.clone(),
+        }],
     };
 
     msg!("tx_to_sign{:?}", tx_to_sign);
