@@ -3,7 +3,8 @@ resolver = "2"
 
 members = [ 
     "counter", 
-    "helloworld", 
+    "helloworld",
+    #"liquidity",
     #"bank_account", 
     "common",
 ]
