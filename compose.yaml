@@ -10,6 +10,9 @@ services:
 
       NETWORK_MODE: "localnet" # localnet, devnet, testnet, mainnet
       DATA_DIR: "/arch-data" # directory where data will be stored
+
+      LEADER_PEER_ID: "16Uiu2HAkwZ1Qt1W71Jv5SrQpskVDze6zMckRkYwDaw3QveL8yQ7K"
+      VALIDATOR_WHITELIST: "16Uiu2HAm16MXYPXSAjRRemqrLziyn4SHJHJm2cs8ZFJXA9Rti1sp,16Uiu2HAmNSgzbfJx974H8aJPrGyEq1X755Mfym8uZ8vGB17RUHwq"
     volumes:
       - ./arch-data/bootnode:/arch-data
     networks:
@@ -18,7 +21,7 @@ services:
 
   leader:
     platform: linux/amd64
-    build: ./docker/validator
+    image: ghcr.io/arch-network/validator:latest
     ports:
       - 19002:19002
       - 9002:9002
@@ -30,7 +33,6 @@ services:
       DATA_DIR: "/arch-data" # directory where data will be stored
       PRIVATE_KEY_PASSWORD: "" # Provide a password if you'd like to encrypt the local node keys.
       BOOT_NODE_ENDPOINT: "/ip4/172.30.0.10/tcp/19001/p2p/16Uiu2HAmA5DZfSpvcEqpuYyPjDSgx5G3e7bJLbgK5m5LBc6rnLes"
-      LEADER_PEERID: "16Uiu2HAkwZ1Qt1W71Jv5SrQpskVDze6zMckRkYwDaw3QveL8yQ7K"
       
       RPC_BIND_IP: "0.0.0.0" # bind to all IPs
       RPC_BIND_PORT: "9002" # TCP 9002
@@ -50,7 +52,7 @@ services:
 
   validator-1:
     platform: linux/amd64
-    build: ./docker/validator
+    image: ghcr.io/arch-network/validator:latest
     ports:
       - 19003:19003
       - 9003:9003
@@ -62,7 +64,6 @@ services:
       DATA_DIR: "/arch-data" # directory where data will be stored
       PRIVATE_KEY_PASSWORD: "" # Provide a password if you'd like to encrypt the local node keys.
       BOOT_NODE_ENDPOINT: "/ip4/172.30.0.10/tcp/19001/p2p/16Uiu2HAmA5DZfSpvcEqpuYyPjDSgx5G3e7bJLbgK5m5LBc6rnLes"
-      LEADER_PEERID: "16Uiu2HAkwZ1Qt1W71Jv5SrQpskVDze6zMckRkYwDaw3QveL8yQ7K"
       
       RPC_BIND_IP: "0.0.0.0" # bind to all IPs
       RPC_BIND_PORT: "9003" # TCP 9002
@@ -82,7 +83,7 @@ services:
 
   validator-2:
     platform: linux/amd64
-    build: ./docker/validator
+    image: ghcr.io/arch-network/validator:latest
     ports:
       - 19004:19004
       - 9004:9004
@@ -94,7 +95,6 @@ services:
       DATA_DIR: "/arch-data" # directory where data will be stored
       PRIVATE_KEY_PASSWORD: "" # Provide a password if you'd like to encrypt the local node keys.
       BOOT_NODE_ENDPOINT: "/ip4/172.30.0.10/tcp/19001/p2p/16Uiu2HAmA5DZfSpvcEqpuYyPjDSgx5G3e7bJLbgK5m5LBc6rnLes"
-      LEADER_PEERID: "16Uiu2HAkwZ1Qt1W71Jv5SrQpskVDze6zMckRkYwDaw3QveL8yQ7K"
       
       RPC_BIND_IP: "0.0.0.0" # bind to all IPs
       RPC_BIND_PORT: "9004" # TCP 9004

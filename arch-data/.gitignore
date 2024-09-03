@@ -1,6 +1,9 @@
 # Ignore validator testnet files
-validator-*/
+validator-*/testnet/*
 leader/testnet/*
+bootnode/*
 
-# Except the one containing the private key
+# Except the ones containing the private key
+!bootnode/p2p_identity
 !leader/testnet/arch-secret
+!validator-*/testnet/arch-secret
