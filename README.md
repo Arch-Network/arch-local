@@ -114,7 +114,7 @@ cargo-build-sbf
 
 - Uninstall rust
 ```bash
-rustup uninstall self
+rustup self uninstall
 ```
 
 - Ensure rust is completely removed
