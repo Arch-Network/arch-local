@@ -8,7 +8,7 @@ use arch_program::{
         validate_utxo_ownership, get_network_xonly_pubkey,
         set_transaction_to_sign, next_account_info,
     },
-    helper::get_state_trasition_tx,
+    helper::get_state_transition_tx,
     transaction_to_sign::TransactionToSign,
     program_error::ProgramError,
     input_to_sign::InputToSign,
