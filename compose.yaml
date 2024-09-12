@@ -1,7 +1,7 @@
 services:
   bootnode:
     platform: linux/amd64
-    image: ghcr.io/arch-network/bootnode:latest
+    image: ghcr.io/arch-network/bootnode@sha256:8ae69a30aef0bf2449d5aaefffd6a8b41bc5498e0ead97f6b599a8244618991f
     ports:
       - 19001:19001
     environment:
@@ -18,7 +18,7 @@ services:
 
   leader:
     platform: linux/amd64
-    image: ghcr.io/arch-network/validator:latest
+    image: ghcr.io/arch-network/validator@sha256:6a3e641efa79d4c9a3c2adb6bfe8108c067cd2c684a197cb16c70829a44bff70
     ports:
       - 19002:19002
       - 9002:9002
@@ -50,7 +50,7 @@ services:
 
   validator-1:
     platform: linux/amd64
-    image: ghcr.io/arch-network/validator:latest
+    image: ghcr.io/arch-network/validator@sha256:6a3e641efa79d4c9a3c2adb6bfe8108c067cd2c684a197cb16c70829a44bff70
     ports:
       - 19003:19003
       - 9003:9003
@@ -82,7 +82,7 @@ services:
 
   validator-2:
     platform: linux/amd64
-    image: ghcr.io/arch-network/validator:latest
+    image: ghcr.io/arch-network/validator@sha256:6a3e641efa79d4c9a3c2adb6bfe8108c067cd2c684a197cb16c70829a44bff70
     ports:
       - 19004:19004
       - 9004:9004
