@@ -86,7 +86,18 @@ services:
       - RPC_BIND_IP=0.0.0.0
       - RPC_BIND_PORT=9002
       - NETWORK_MODE=${NETWORK_MODE:-localnet}
+
+      - RPC_BIND_IP=0.0.0.0 # bind to all IPs
+      - RPC_BIND_PORT=9002 # TCP 9002
+      - P2P_BIND_PORT=19002
+
+      - BITCOIN_RPC_ENDPOINT=bitcoin-node.dev.aws.archnetwork.xyz
+      - BITCOIN_RPC_PORT=18443
+      - BITCOIN_RPC_USERNAME=bitcoin
+      - BITCOIN_RPC_PASSWORD=428bae8f3c94f8c39c50757fc89c39bc7e6ebc70ebf8f618
+      - BITCOIN_RPC_WALLET=devwallet
     ports:
+      - 19002:19002
       - 9002:9002
     networks:
       - arch
@@ -99,6 +110,16 @@ services:
       - RUSTC_LOG_COLOR=never
       - NETWORK_MODE=${NETWORK_MODE:-localnet}
       - REPLICA_ID=1
+      - PRIVATE_KEY_PASSWORD="" # Provide a password if you'd like to encrypt the local node keys.      
+      - RPC_BIND_IP=0.0.0.0 # bind to all IPs
+      - RPC_BIND_PORT=9003
+      - P2P_BIND_PORT=19003
+
+      - BITCOIN_RPC_ENDPOINT=bitcoin-node.dev.aws.archnetwork.xyz
+      - BITCOIN_RPC_PORT=18443
+      - BITCOIN_RPC_USERNAME=bitcoin
+      - BITCOIN_RPC_PASSWORD=428bae8f3c94f8c39c50757fc89c39bc7e6ebc70ebf8f618
+      - BITCOIN_RPC_WALLET=devwallet
     volumes:
       - ./.arch-data/validator_arch_data:/arch_data
       - ./.arch-data/bootnode_arch_data:/bootnode_data:ro
@@ -116,6 +137,18 @@ services:
       - RUSTC_LOG_COLOR=never
       - NETWORK_MODE=${NETWORK_MODE:-localnet}
       - REPLICA_ID=2
+      - PRIVATE_KEY_PASSWORD="" # Provide a password if you'd like to encrypt the local node keys.
+
+      - RPC_BIND_IP=0.0.0.0 # bind to all IPs
+      - RPC_BIND_PORT=9004 # TCP 9004
+      - P2P_BIND_PORT=19004
+
+      - BITCOIN_RPC_ENDPOINT=bitcoin-node.dev.aws.archnetwork.xyz
+      - BITCOIN_RPC_PORT=18443
+      - BITCOIN_RPC_USERNAME=bitcoin
+      - BITCOIN_RPC_PASSWORD=428bae8f3c94f8c39c50757fc89c39bc7e6ebc70ebf8f618
+      - BITCOIN_RPC_WALLET=devwallet
+
     volumes:
       - ./.arch-data/validator_arch_data:/arch_data
       - ./.arch-data/bootnode_arch_data:/bootnode_data:ro
