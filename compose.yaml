@@ -19,7 +19,7 @@ services:
         echo "> Add Leader Peer ID to whitelist"
         echo "$$LEADER_PEER_ID" >> /bootnode_data/validator_whitelist
 
-        for i in $(seq 1 ${REPLICA_COUNT}); do
+        for i in $(seq 1 $${REPLICA_COUNT}); do
           echo ">> Making directory for replica $$i"
           mkdir -p /validators_data/$$i
           /validator -d /validators_data/$$i --generate-peer-id | tee -a /bootnode_data/validator_whitelist;
