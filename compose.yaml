@@ -91,37 +91,6 @@ services:
     networks:
       - arch
 
-  # validator:
-  #   image: ghcr.io/arch-network/validator:latest
-  #   depends_on:
-  #     - bootnode
-  #   command:
-  #     - /bin/bash
-  #     - -c
-  #     - |
-  #       set -ex
-  #       REPLICA_ID=$$(echo ${NAME} | sed 's/[^0-9]*//g')
-  #       echo "Running Replica $$NAME"
-  #       while [ ! -f /bootnode_data/leader_peer_id ]; do
-  #         echo "Waiting for leader_peer_id file..."
-  #         sleep 1
-  #       done
-  #       LEADER_PEER_ID=$(cat /bootnode_data/leader_peer_id)
-  #       echo "Leader Peer ID: $$LEADER_PEER_ID"
-  #       /validator -d /arch_data/$$REPLICA_ID -n ${NETWORK_MODE:-localnet} -b "/ip4/172.19.0.250/tcp/19001/p2p/$$(cat /bootnode_data/peer_id)"
-  #   volumes:
-  #     - ./.arch-data/validator_arch_data:/arch_data
-  #     - ./.arch-data/bootnode_arch_data:/bootnode_data:ro
-  #   environment:
-  #     - RUST_LOG=${RUST_LOG:-info,validator=debug}
-  #     - RUSTC_LOG_COLOR=never
-  #     - NETWORK_MODE=${NETWORK_MODE:-localnet}
-  #   deploy:
-  #     mode: replicated
-  #     replicas: ${REPLICA_COUNT:-2}
-  #   networks:
-  #     - arch
-
   validator-1:
     image: ghcr.io/arch-network/validator:latest
     command: /usr/local/bin/validator.sh
