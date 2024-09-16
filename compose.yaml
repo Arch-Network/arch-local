@@ -11,19 +11,25 @@ services:
         echo "Generating validator PeerIds..."
         rm -f /bootnode_data/validator_whitelist /bootnode_data/leader_peer_id
         echo "Replicas: ${REPLICA_COUNT}"
-        LEADER_PEER_ID=$(/validator --generate-peer-id)
+        
         echo "Leader PeerID: $$LEADER_PEER_ID"
+        LEADER_PEER_ID=$(/validator -d /leader_data --generate-peer-id | tee -a /bootnode_data/validator_whitelist)
         echo "$$LEADER_PEER_ID" > /bootnode_data/leader_peer_id
-        for i in $(seq 1 $${REPLICA_COUNT}); do
-          mkdir -p /arch_data/$i
-          PEER_ID=$(/validator --generate-peer-id)
-          echo "$$PEER_ID" >> /bootnode_data/validator_whitelist
+        
+
+        echo "Add Leader Peer ID to whitelist"
+        echo "$$LEADER_PEER_ID" >> /bootnode_data/validator_whitelist
+
+        for i in $(seq 1 ${REPLICA_COUNT}); do
+          mkdir -p /arch_data/$$i
+          /validator -d /arch_data/$$i --generate-peer-id | tee -a /bootnode_data/validator_whitelist;
         done
         sort -u -o /bootnode_data/validator_whitelist /bootnode_data/validator_whitelist
         echo "Generated validator whitelist:"
         cat /bootnode_data/validator_whitelist
     volumes:
       - ./validator_arch_data:/arch_data
+      - ./leader_arch_data:/leader_data
       - ./bootnode_arch_data:/bootnode_data
     environment:
       - REPLICA_COUNT=${REPLICA_COUNT:-2}
@@ -70,7 +76,9 @@ services:
         done
         LEADER_PEER_ID=$(cat /bootnode_data/leader_peer_id)
         echo "Leader Peer ID: $$LEADER_PEER_ID"
-        /validator -d /arch_data -n ${NETWORK_MODE:-localnet} -b "/ip4/172.19.0.250/tcp/19001/p2p/16Uiu2HAmQ9FQFSubqKJKrYfYZkQkCc9xUMwYnqskwMDRiPc69T56" 
+        # Get bootnode peer ID
+        BOOTNODE_PEER_ID=$(cat /bootnode_data/peer_id)
+        /validator -d /arch_data -n ${NETWORK_MODE:-localnet} -b "/ip4/172.19.0.250/tcp/19001/p2p/$$BOOTNODE_PEER_ID"
     volumes:
       - ./leader_arch_data:/arch_data
       - ./bootnode_arch_data:/bootnode_data:ro
@@ -102,7 +110,7 @@ services:
         done
         LEADER_PEER_ID=$(cat /bootnode_data/leader_peer_id)
         echo "Leader Peer ID: $LEADER_PEER_ID"
-        /validator -d /arch_data/$$REPLICA_ID -n ${NETWORK_MODE:-localnet} -b "/ip4/172.19.0.250/tcp/19001/p2p/16Uiu2HAmQ9FQFSubqKJKrYfYZkQkCc9xUMwYnqskwMDRiPc69T56"
+        /validator -d /arch_data/$$REPLICA_ID -n ${NETWORK_MODE:-localnet} -b "/ip4/172.19.0.250/tcp/19001/p2p/$(cat /bootnode_data/peer_id)"
     volumes:
       - ./validator_arch_data:/arch_data
       - ./bootnode_arch_data:/bootnode_data:ro
