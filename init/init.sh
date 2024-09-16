@@ -5,7 +5,7 @@ set -e
 
 while :
 do
-  IS_READY=$(curl -sLX POST -H 'Content-Type: application/json' -d '{"jsonrpc":"2.0","id":"id","method":"all_nodes_ready","params":[]}' http://bootnode:9001/ | jq .result)
+  IS_READY=$(curl -sLX POST -H 'Content-Type: application/json' -d '{"jsonrpc":"2.0","id":"id","method":"all_nodes_ready","params":[]}' http://bootnode:9002/ | jq .result)
   if [ "$IS_READY" = true ] ; then
     break;
   fi
