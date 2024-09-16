@@ -7,30 +7,28 @@ services:
       - /bin/bash
       - -c
       - |
-        set -ex
+        set -e
         echo "Generating validator PeerIds..."
         rm -f /bootnode_data/validator_whitelist /bootnode_data/leader_peer_id
-        echo "Replicas: ${REPLICA_COUNT}"
-        
-        echo "Leader PeerID: $$LEADER_PEER_ID"
-        LEADER_PEER_ID=$(/validator -d /leader_data --generate-peer-id | tee -a /bootnode_data/validator_whitelist)
-        echo "$$LEADER_PEER_ID" > /bootnode_data/leader_peer_id
-        
 
-        echo "Add Leader Peer ID to whitelist"
+        echo "> Replicas: ${REPLICA_COUNT}"
+        LEADER_PEER_ID=$$(/validator -d /leader_data --generate-peer-id | tee -a /bootnode_data/validator_whitelist)
+        echo "> Leader PeerID: $$LEADER_PEER_ID"
+        echo "$$LEADER_PEER_ID" > /bootnode_data/leader_peer_id
+
+        echo "> Add Leader Peer ID to whitelist"
         echo "$$LEADER_PEER_ID" >> /bootnode_data/validator_whitelist
 
         for i in $(seq 1 ${REPLICA_COUNT}); do
-          mkdir -p /arch_data/$$i
-          /validator -d /arch_data/$$i --generate-peer-id | tee -a /bootnode_data/validator_whitelist;
+          echo ">> Making directory for replica $$i"
+          mkdir -p /validators_data/$$i
+          /validator -d /validators_data/$$i --generate-peer-id | tee -a /bootnode_data/validator_whitelist;
         done
         sort -u -o /bootnode_data/validator_whitelist /bootnode_data/validator_whitelist
-        echo "Generated validator whitelist:"
-        cat /bootnode_data/validator_whitelist
     volumes:
-      - ./validator_arch_data:/arch_data
-      - ./leader_arch_data:/leader_data
-      - ./bootnode_arch_data:/bootnode_data
+      - ./.arch-data/validator_arch_data:/validators_data
+      - ./.arch-data/leader_arch_data:/leader_data
+      - ./.arch-data/bootnode_arch_data:/bootnode_data
     environment:
       - REPLICA_COUNT=${REPLICA_COUNT:-2}
 
@@ -40,7 +38,7 @@ services:
       - /bin/bash
       - -c
       - |
-        set -ex
+        set -e
         while [ ! -f /arch_data/leader_peer_id ]; do
           echo "Waiting for leader_peer_id file..."
           sleep 1
@@ -54,7 +52,7 @@ services:
       init:
         condition: service_completed_successfully
     volumes:
-      - ./bootnode_arch_data:/arch_data
+      - ./.arch-data/bootnode_arch_data:/arch_data
     networks:
       arch:
         ipv4_address: 172.19.0.250
@@ -80,8 +78,8 @@ services:
         BOOTNODE_PEER_ID=$(cat /bootnode_data/peer_id)
         /validator -d /arch_data -n ${NETWORK_MODE:-localnet} -b "/ip4/172.19.0.250/tcp/19001/p2p/$$BOOTNODE_PEER_ID"
     volumes:
-      - ./leader_arch_data:/arch_data
-      - ./bootnode_arch_data:/bootnode_data:ro
+      - ./.arch-data/leader_arch_data:/arch_data
+      - ./.arch-data/bootnode_arch_data:/bootnode_data:ro
     environment:
       - RUST_LOG=${RUST_LOG:-info,validator=debug}
       - RUSTC_LOG_COLOR=never
@@ -93,34 +91,68 @@ services:
     networks:
       - arch
 
-  validator:
+  # validator:
+  #   image: ghcr.io/arch-network/validator:latest
+  #   depends_on:
+  #     - bootnode
+  #   command:
+  #     - /bin/bash
+  #     - -c
+  #     - |
+  #       set -ex
+  #       REPLICA_ID=$$(echo ${NAME} | sed 's/[^0-9]*//g')
+  #       echo "Running Replica $$NAME"
+  #       while [ ! -f /bootnode_data/leader_peer_id ]; do
+  #         echo "Waiting for leader_peer_id file..."
+  #         sleep 1
+  #       done
+  #       LEADER_PEER_ID=$(cat /bootnode_data/leader_peer_id)
+  #       echo "Leader Peer ID: $$LEADER_PEER_ID"
+  #       /validator -d /arch_data/$$REPLICA_ID -n ${NETWORK_MODE:-localnet} -b "/ip4/172.19.0.250/tcp/19001/p2p/$$(cat /bootnode_data/peer_id)"
+  #   volumes:
+  #     - ./.arch-data/validator_arch_data:/arch_data
+  #     - ./.arch-data/bootnode_arch_data:/bootnode_data:ro
+  #   environment:
+  #     - RUST_LOG=${RUST_LOG:-info,validator=debug}
+  #     - RUSTC_LOG_COLOR=never
+  #     - NETWORK_MODE=${NETWORK_MODE:-localnet}
+  #   deploy:
+  #     mode: replicated
+  #     replicas: ${REPLICA_COUNT:-2}
+  #   networks:
+  #     - arch
+
+  validator-1:
     image: ghcr.io/arch-network/validator:latest
-    depends_on:
-      - bootnode
-    command:
-      - /bin/bash
-      - -c
-      - |
-        set -ex
-        REPLICA_ID=$(($(hostname -i | cut -d "." -f4)-1))
-        echo "Running Replica $REPLICA_ID"
-        while [ ! -f /bootnode_data/leader_peer_id ]; do
-          echo "Waiting for leader_peer_id file..."
-          sleep 1
-        done
-        LEADER_PEER_ID=$(cat /bootnode_data/leader_peer_id)
-        echo "Leader Peer ID: $LEADER_PEER_ID"
-        /validator -d /arch_data/$$REPLICA_ID -n ${NETWORK_MODE:-localnet} -b "/ip4/172.19.0.250/tcp/19001/p2p/$(cat /bootnode_data/peer_id)"
-    volumes:
-      - ./validator_arch_data:/arch_data
-      - ./bootnode_arch_data:/bootnode_data:ro
+    command: /usr/local/bin/validator.sh
     environment:
       - RUST_LOG=${RUST_LOG:-info,validator=debug}
       - RUSTC_LOG_COLOR=never
       - NETWORK_MODE=${NETWORK_MODE:-localnet}
-    deploy:
-      mode: replicated
-      replicas: ${REPLICA_COUNT:-2}
+      - REPLICA_ID=1
+    volumes:
+      - ./.arch-data/validator_arch_data:/arch_data
+      - ./.arch-data/bootnode_arch_data:/bootnode_data:ro
+      - ./validator.sh:/usr/local/bin/validator.sh
+    depends_on:
+      - bootnode
+    networks:
+      - arch
+
+  validator-2:
+    image: ghcr.io/arch-network/validator:latest
+    command: /usr/local/bin/validator.sh
+    environment:
+      - RUST_LOG=${RUST_LOG:-info,validator=debug}
+      - RUSTC_LOG_COLOR=never
+      - NETWORK_MODE=${NETWORK_MODE:-localnet}
+      - REPLICA_ID=2
+    volumes:
+      - ./.arch-data/validator_arch_data:/arch_data
+      - ./.arch-data/bootnode_arch_data:/bootnode_data:ro
+      - ./validator.sh:/usr/local/bin/validator.sh
+    depends_on:
+      - bootnode
     networks:
       - arch
 
