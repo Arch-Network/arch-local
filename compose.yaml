@@ -84,10 +84,10 @@ services:
       - RUST_LOG=${RUST_LOG:-info,validator=debug}
       - RUSTC_LOG_COLOR=never
       - RPC_BIND_IP=0.0.0.0
-      - RPC_BIND_PORT=9001
+      - RPC_BIND_PORT=9002
       - NETWORK_MODE=${NETWORK_MODE:-localnet}
     ports:
-      - 9001:9001
+      - 9002:9002
     networks:
       - arch
 
