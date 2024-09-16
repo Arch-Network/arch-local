@@ -1,121 +1,125 @@
-services:
-  bootnode:
-    platform: linux/amd64
-    image: ghcr.io/arch-network/bootnode:latest
-    ports:
-      - 19001:19001
-    environment:
-      RUST_LOG: "info" # debug, info, error, warn, trace, off
-      RUST_BACKTRACE: "1" # enable error stack traces
+version: '3.8'
 
-      NETWORK_MODE: "localnet" # localnet, devnet, testnet, mainnet
-      DATA_DIR: "/arch-data" # directory where data will be stored
+services:
+  init:
+    image: ghcr.io/arch-network/validator:latest
+    command: 
+      - /bin/bash
+      - -c
+      - |
+        set -ex
+        echo "Generating validator PeerIds..."
+        rm -f /bootnode_data/validator_whitelist /bootnode_data/leader_peer_id
+        echo "Replicas: ${REPLICA_COUNT}"
+        LEADER_PEER_ID=$(/validator --generate-peer-id)
+        echo "Leader PeerID: $$LEADER_PEER_ID"
+        echo "$$LEADER_PEER_ID" > /bootnode_data/leader_peer_id
+        for i in $(seq 1 $${REPLICA_COUNT}); do
+          mkdir -p /arch_data/$i
+          PEER_ID=$(/validator --generate-peer-id)
+          echo "$$PEER_ID" >> /bootnode_data/validator_whitelist
+        done
+        sort -u -o /bootnode_data/validator_whitelist /bootnode_data/validator_whitelist
+        echo "Generated validator whitelist:"
+        cat /bootnode_data/validator_whitelist
     volumes:
-      - ./arch-data/bootnode:/arch-data
+      - ./validator_arch_data:/arch_data
+      - ./bootnode_arch_data:/bootnode_data
+    environment:
+      - REPLICA_COUNT=${REPLICA_COUNT:-2}
+
+  bootnode:
+    image: ghcr.io/arch-network/bootnode:latest
+    command: 
+      - /bin/bash
+      - -c
+      - |
+        set -ex
+        while [ ! -f /arch_data/leader_peer_id ]; do
+          echo "Waiting for leader_peer_id file..."
+          sleep 1
+        done
+        WHITELIST=$(sort -u /arch_data/validator_whitelist | paste -sd "," -)
+        LEADER_PEER_ID=$(cat /arch_data/leader_peer_id)
+        echo "Validator Whitelist: $$WHITELIST"
+        echo "Leader Peer ID: $$LEADER_PEER_ID"
+        /bootnode -d /arch_data -n ${NETWORK_MODE:-localnet} --leader-peer-id "$$LEADER_PEER_ID" --validator-whitelist "$$WHITELIST"
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    volumes:
+      - ./bootnode_arch_data:/arch_data
     networks:
-      arch-network:
-        ipv4_address: 172.30.0.10 # If you change this IP, make sure to update the validator endpoint below.
+      arch:
+        ipv4_address: 172.19.0.250
+    environment:
+      - NETWORK_MODE=${NETWORK_MODE:-localnet}
 
   leader:
-    platform: linux/amd64
     image: ghcr.io/arch-network/validator:latest
-    ports:
-      - 19002:19002
-      - 9002:9002
-    environment:
-      RUST_LOG: "info,validator=debug" # debug, info, error, warn, trace, off
-      RUST_BACKTRACE: "1" # enable error stack traces
-
-      NETWORK_MODE: "localnet" # localnet, devnet, testnet, mainnet
-      DATA_DIR: "/arch-data" # directory where data will be stored
-      PRIVATE_KEY_PASSWORD: "" # Provide a password if you'd like to encrypt the local node keys.
-      BOOT_NODE_ENDPOINT: "/ip4/172.30.0.10/tcp/19001/p2p/16Uiu2HAmA5DZfSpvcEqpuYyPjDSgx5G3e7bJLbgK5m5LBc6rnLes"
-      LEADER_PEERID: "16Uiu2HAkwZ1Qt1W71Jv5SrQpskVDze6zMckRkYwDaw3QveL8yQ7K"
-      
-      RPC_BIND_IP: "0.0.0.0" # bind to all IPs
-      RPC_BIND_PORT: "9002" # TCP 9002
-      P2P_BIND_PORT: "19002"
-
-      BITCOIN_RPC_ENDPOINT: "bitcoin-node.dev.aws.archnetwork.xyz"
-      BITCOIN_RPC_PORT: "18443"
-      BITCOIN_RPC_USERNAME: "bitcoin"
-      BITCOIN_RPC_PASSWORD: "428bae8f3c94f8c39c50757fc89c39bc7e6ebc70ebf8f618"
-      BITCOIN_RPC_WALLET: "devwallet"
-    volumes:
-      - ./arch-data/leader:/arch-data
     depends_on:
       - bootnode
-    networks:
-      - arch-network
-
-  validator-1:
-    platform: linux/amd64
-    image: ghcr.io/arch-network/validator:latest
-    ports:
-      - 19003:19003
-      - 9003:9003
-    environment:
-      LOG_LEVEL: "info,validator=debug" # debug, info, error, warn, trace, off
-      RUST_BACKTRACE: "1" # enable error stack traces
-
-      NETWORK_MODE: "localnet" # localnet, devnet, testnet, mainnet
-      DATA_DIR: "/arch-data" # directory where data will be stored
-      PRIVATE_KEY_PASSWORD: "" # Provide a password if you'd like to encrypt the local node keys.
-      BOOT_NODE_ENDPOINT: "/ip4/172.30.0.10/tcp/19001/p2p/16Uiu2HAmA5DZfSpvcEqpuYyPjDSgx5G3e7bJLbgK5m5LBc6rnLes"
-      LEADER_PEERID: "16Uiu2HAkwZ1Qt1W71Jv5SrQpskVDze6zMckRkYwDaw3QveL8yQ7K"
-      
-      RPC_BIND_IP: "0.0.0.0" # bind to all IPs
-      RPC_BIND_PORT: "9003" # TCP 9002
-      P2P_BIND_PORT: "19003"
-
-      BITCOIN_RPC_ENDPOINT: "bitcoin-node.dev.aws.archnetwork.xyz"
-      BITCOIN_RPC_PORT: "18443"
-      BITCOIN_RPC_USERNAME: "bitcoin"
-      BITCOIN_RPC_PASSWORD: "428bae8f3c94f8c39c50757fc89c39bc7e6ebc70ebf8f618"
-      BITCOIN_RPC_WALLET: "devwallet"
+    command:
+      - /bin/bash
+      - -c
+      - |
+        set -ex
+        while [ ! -f /bootnode_data/leader_peer_id ]; do
+          echo "Waiting for leader_peer_id file..."
+          sleep 1
+        done
+        LEADER_PEER_ID=$(cat /bootnode_data/leader_peer_id)
+        echo "Leader Peer ID: $$LEADER_PEER_ID"
+        /validator -d /arch_data -n ${NETWORK_MODE:-localnet} -b "/ip4/172.19.0.250/tcp/19001/p2p/16Uiu2HAmQ9FQFSubqKJKrYfYZkQkCc9xUMwYnqskwMDRiPc69T56" 
     volumes:
-      - ./arch-data/validator-1:/arch-data
+      - ./leader_arch_data:/arch_data
+      - ./bootnode_arch_data:/bootnode_data:ro
+    environment:
+      - RUST_LOG=${RUST_LOG:-info,validator=debug}
+      - RUSTC_LOG_COLOR=never
+      - RPC_BIND_IP=0.0.0.0
+      - RPC_BIND_PORT=9001
+      - NETWORK_MODE=${NETWORK_MODE:-localnet}
+    ports:
+      - 9001:9001
+    networks:
+      - arch
+
+  validator:
+    image: ghcr.io/arch-network/validator:latest
     depends_on:
       - bootnode
-    networks:
-      - arch-network
-
-  validator-2:
-    platform: linux/amd64
-    image: ghcr.io/arch-network/validator:latest
-    ports:
-      - 19004:19004
-      - 9004:9004
-    environment:
-      LOG_LEVEL: "info,validator=debug" # debug, info, error, warn, trace, off
-      RUST_BACKTRACE: "1" # enable error stack traces
-
-      NETWORK_MODE: "localnet" # localnet, devnet, testnet, mainnet
-      DATA_DIR: "/arch-data" # directory where data will be stored
-      PRIVATE_KEY_PASSWORD: "" # Provide a password if you'd like to encrypt the local node keys.
-      BOOT_NODE_ENDPOINT: "/ip4/172.30.0.10/tcp/19001/p2p/16Uiu2HAmA5DZfSpvcEqpuYyPjDSgx5G3e7bJLbgK5m5LBc6rnLes"
-      LEADER_PEERID: "16Uiu2HAkwZ1Qt1W71Jv5SrQpskVDze6zMckRkYwDaw3QveL8yQ7K"
-      
-      RPC_BIND_IP: "0.0.0.0" # bind to all IPs
-      RPC_BIND_PORT: "9004" # TCP 9004
-      P2P_BIND_PORT: "19004"
-
-      BITCOIN_RPC_ENDPOINT: "bitcoin-node.dev.aws.archnetwork.xyz"
-      BITCOIN_RPC_PORT: "18443"
-      BITCOIN_RPC_USERNAME: "bitcoin"
-      BITCOIN_RPC_PASSWORD: "428bae8f3c94f8c39c50757fc89c39bc7e6ebc70ebf8f618"
-      BITCOIN_RPC_WALLET: "devwallet"
+    command:
+      - /bin/bash
+      - -c
+      - |
+        set -ex
+        REPLICA_ID=$(($(hostname -i | cut -d "." -f4)-1))
+        echo "Running Replica $REPLICA_ID"
+        while [ ! -f /bootnode_data/leader_peer_id ]; do
+          echo "Waiting for leader_peer_id file..."
+          sleep 1
+        done
+        LEADER_PEER_ID=$(cat /bootnode_data/leader_peer_id)
+        echo "Leader Peer ID: $LEADER_PEER_ID"
+        /validator -d /arch_data/$$REPLICA_ID -n ${NETWORK_MODE:-localnet} -b "/ip4/172.19.0.250/tcp/19001/p2p/16Uiu2HAmQ9FQFSubqKJKrYfYZkQkCc9xUMwYnqskwMDRiPc69T56"
     volumes:
-      - ./arch-data/validator-2:/arch-data
-    depends_on:
-      - bootnode
+      - ./validator_arch_data:/arch_data
+      - ./bootnode_arch_data:/bootnode_data:ro
+    environment:
+      - RUST_LOG=${RUST_LOG:-info,validator=debug}
+      - RUSTC_LOG_COLOR=never
+      - NETWORK_MODE=${NETWORK_MODE:-localnet}
+    deploy:
+      mode: replicated
+      replicas: ${REPLICA_COUNT:-2}
     networks:
-      - arch-network
+      - arch
 
 networks:
-  arch-network:
+  arch:
     ipam:
-      driver: default # bridge
+      driver: default
       config:
-        - subnet: 172.30.0.0/24 # If you change the subnet, make sure to update the bootnode ip above.
-          gateway: 172.30.0.1
+        - subnet: 172.19.0.0/24
+          gateway: 172.19.0.1
