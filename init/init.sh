@@ -18,13 +18,13 @@ echo "Nodes are ready! Running start_key_exchange"
 curl -sLX POST \
   -H 'Content-Type: application/json' \
   -d '{"jsonrpc":"2.0","id":"id","method":"start_key_exchange","params":[]}' \
-  http://bootnode:9001/
+  http://bootnode:9002/
 
 echo -e "\nRunning start_dkg"
 
 curl -sLX POST \
   -H 'Content-Type: application/json' \
   -d '{"jsonrpc":"2.0","id":"id","method":"start_dkg","params":[]}' \
-  http://bootnode:9001/
+  http://bootnode:9002/
 
 echo -e "\nDone!"
