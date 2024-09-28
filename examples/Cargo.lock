@@ -1268,6 +1268,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
 
 [[package]]
+name = "swap"
+version = "0.1.0"
+dependencies = [
+ "arch_program",
+ "bitcoin",
+ "bitcoincore-rpc",
+ "borsh",
+ "common",
+ "env_logger",
+ "hex",
+ "log",
+ "serial_test",
+]
+
+[[package]]
 name = "syn"
 version = "2.0.75"
 source = "registry+https://github.com/rust-lang/crates.io-index"
