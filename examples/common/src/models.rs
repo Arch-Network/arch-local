@@ -82,7 +82,7 @@ impl CallerInfo {
             Ok(key) => SecretKey::from_str(&key).unwrap(),
             Err(_) => {
                 let (key, _) = secp.generate_keypair(&mut OsRng);
-                fs::write(file_path, &key.display_secret().to_string())
+                fs::write(file_path, key.display_secret().to_string())
                     .map_err(|_| anyhow!("Unable to write file"))?;
                 key
             }
