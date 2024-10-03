@@ -162,9 +162,9 @@ mod tests {
                 accounts: vec![AccountMeta {
                     pubkey: caller_pubkey.clone(),
                     is_signer: true,
-                    is_writable: true
+                    is_writable: true,
                 }],
-                data: instruction_data
+                data: instruction_data,
             },
             vec![caller_keypair.clone()],
         )
@@ -179,7 +179,9 @@ mod tests {
 
         // 10. Verify that the program is owner of caller account
         assert_eq!(
-            read_account_info(NODE1_ADDRESS, caller_pubkey.clone()).unwrap().owner, 
+            read_account_info(NODE1_ADDRESS, caller_pubkey.clone())
+                .unwrap()
+                .owner,
             program_pubkey,
             "Program should be owner of caller account"
         );
@@ -191,12 +193,13 @@ mod tests {
                 accounts: vec![AccountMeta {
                     pubkey: caller_pubkey.clone(),
                     is_signer: true,
-                    is_writable: true
+                    is_writable: true,
                 }],
                 data: borsh::to_vec(&HelloWorldParams {
                     name: hello_name.to_string(),
-                    tx_hex: hex::decode(prepare_fees()).unwrap()
-                }).unwrap()
+                    tx_hex: hex::decode(prepare_fees()).unwrap(),
+                })
+                .unwrap(),
             },
             vec![caller_keypair],
         )
@@ -214,7 +217,7 @@ mod tests {
             caller_account_info
         );
         assert_eq!(
-            caller_account_info.utxo, 
+            caller_account_info.utxo,
             format!("{}:{}", processed_tx.bitcoin_txids[0], 0),
             "Caller account utxo doesn't match bitcoin txid"
         );
@@ -226,12 +229,13 @@ mod tests {
                 accounts: vec![AccountMeta {
                     pubkey: caller_pubkey.clone(),
                     is_signer: true,
-                    is_writable: true
+                    is_writable: true,
                 }],
                 data: borsh::to_vec(&HelloWorldParams {
                     name: hello_name.to_string(),
-                    tx_hex: hex::decode(prepare_fees()).unwrap()
-                }).unwrap()
+                    tx_hex: hex::decode(prepare_fees()).unwrap(),
+                })
+                .unwrap(),
             },
             vec![caller_keypair],
         )
@@ -249,7 +253,7 @@ mod tests {
             caller_account_info
         );
         assert_eq!(
-            caller_account_info.utxo, 
+            caller_account_info.utxo,
             format!("{}:{}", processed_tx.bitcoin_txids[0], 0),
             "Caller account utxo doesn't match bitcoin txid"
         );

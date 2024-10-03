@@ -7,14 +7,14 @@ use bitcoin::{
     key::{Parity, UntweakedKeypair, XOnlyPublicKey},
     secp256k1::{Secp256k1, SecretKey},
 };
-use sdk::signature::{Signature};
 use rand_core::OsRng;
+use sdk::arch_program::pubkey::Pubkey;
+use sdk::signature::Signature;
 use serde::{Deserialize, Serialize};
 use serde_json::to_string;
 use sha256::digest;
 use std::fs;
 use std::str::FromStr;
-use sdk::arch_program::pubkey::Pubkey;
 
 /// Represents the parameters for deploying a program
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -82,7 +82,7 @@ impl CallerInfo {
             Ok(key) => SecretKey::from_str(&key).unwrap(),
             Err(_) => {
                 let (key, _) = secp.generate_keypair(&mut OsRng);
-                fs::write(file_path, &key.display_secret().to_string())
+                fs::write(file_path, key.display_secret().to_string())
                     .map_err(|_| anyhow!("Unable to write file"))?;
                 key
             }

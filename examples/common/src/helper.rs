@@ -10,15 +10,11 @@ use bitcoin::{
     Amount, OutPoint, ScriptBuf, Sequence, TapSighashType, Transaction, TxIn, Witness,
 };
 use bitcoincore_rpc::{Auth, Client, RawTx, RpcApi};
-use env_logger;
 use log::{debug, error, info, warn};
 use serde::Deserialize;
 use serde::Serialize;
 use serde_json::{from_str, json, Value};
-use std::env;
 use std::fs;
-use std::process::Child;
-use std::process::Command;
 use std::str::FromStr;
 
 use sdk::processed_transaction::ProcessedTransaction;
@@ -28,7 +24,7 @@ use crate::constants::{
     GET_ACCOUNT_ADDRESS, GET_BEST_BLOCK_HASH, GET_BLOCK, GET_PROCESSED_TRANSACTION, GET_PROGRAM,
     NODE1_ADDRESS, READ_ACCOUNT_INFO, TRANSACTION_NOT_FOUND_CODE,
 };
-use crate::models::{BitcoinRpcInfo, CallerInfo};
+use crate::models::CallerInfo;
 use sdk::arch_program::message::Message;
 use sdk::arch_program::pubkey::Pubkey;
 use sdk::runtime_transaction::RuntimeTransaction;
@@ -104,9 +100,9 @@ fn post_data<T: Serialize + std::fmt::Debug>(url: &str, method: &str, params: T)
 }
 
 /// Returns a caller information using the secret key file specified
-fn get_trader(trader_id: u64) -> Result<CallerInfo> {
+fn _get_trader(trader_id: u64) -> Result<CallerInfo> {
     let file_path = &format!("../../.arch/trader{}.json", trader_id);
-    Ok(CallerInfo::with_secret_key_file(file_path)?)
+    CallerInfo::with_secret_key_file(file_path)
 }
 
 use crate::helper::secp256k1::SecretKey;
@@ -120,7 +116,7 @@ pub fn with_secret_key_file(file_path: &str) -> Result<(UntweakedKeypair, Pubkey
         Ok(key) => SecretKey::from_str(&key).unwrap(),
         Err(_) => {
             let (key, _) = secp.generate_keypair(&mut OsRng);
-            fs::write(file_path, &key.display_secret().to_string())
+            fs::write(file_path, key.display_secret().to_string())
                 .map_err(|_| anyhow!("Unable to write file"))?;
             key
         }
@@ -174,13 +170,7 @@ pub fn sign_and_send_instruction(
     let secp = Secp256k1::new();
     let signatures = signers
         .iter()
-        .map(|signer| {
-            Signature(
-                secp.sign_schnorr(&sig_message, &signer)
-                    .serialize()
-                    .to_vec(),
-            )
-        })
+        .map(|signer| Signature(secp.sign_schnorr(&sig_message, signer).serialize().to_vec()))
         .collect::<Vec<Signature>>();
 
     let params = RuntimeTransaction {
@@ -258,10 +248,10 @@ pub fn deploy_program_txs(program_keypair: UntweakedKeypair, elf_path: &str) -> 
             bytes.extend(len.to_le_bytes());
             bytes.extend(chunk);
             let message = Message {
-                signers: vec![program_pubkey.clone()],
+                signers: vec![program_pubkey],
                 instructions: vec![SystemInstruction::new_extend_bytes_instruction(
                     bytes,
-                    program_pubkey.clone(),
+                    program_pubkey,
                 )],
             };
             let digest_slice =
@@ -383,7 +373,7 @@ pub fn get_program(url: &str, program_id: String) -> String {
 }
 
 /// Returns the best block
-fn get_best_block() -> String {
+fn _get_best_block() -> String {
     let best_block_hash = process_result(post(NODE1_ADDRESS, GET_BEST_BLOCK_HASH))
         .expect("best_block_hash should not fail")
         .as_str()
@@ -514,7 +504,7 @@ pub fn send_utxo(pubkey: Pubkey) -> (String, u32) {
     let rpc =
         Client::new(BITCOIN_NODE_ENDPOINT, userpass).expect("rpc shouldn not fail to be initiated");
 
-    let caller = CallerInfo::with_secret_key_file(CALLER_FILE_PATH)
+    let _caller = CallerInfo::with_secret_key_file(CALLER_FILE_PATH)
         .expect("getting caller info should not fail");
 
     let address = get_account_address(pubkey);
@@ -566,7 +556,7 @@ fn get_account_address(pubkey: Pubkey) -> String {
         .to_string()
 }
 
-fn get_address_utxos(rpc: &Client, address: String) -> Vec<Value> {
+fn _get_address_utxos(rpc: &Client, address: String) -> Vec<Value> {
     let client = reqwest::blocking::Client::new();
 
     let res = client
@@ -587,74 +577,6 @@ fn get_address_utxos(rpc: &Client, address: String) -> Vec<Value> {
         .filter(|utxo| {
             utxo["status"]["block_height"].as_u64().unwrap() <= rpc.get_block_count().unwrap() - 100
         })
-        .map(|utxo| utxo.clone())
+        .cloned()
         .collect()
-}
-
-pub fn start_boot_node(port: u16, arch_nodes: &str, bitcoin_rpc_info: &BitcoinRpcInfo) -> Child {
-    std::env::set_var("RISC0_DEV_MODE", "1");
-
-    let mut command = Command::new("cargo");
-    command.current_dir(env::current_dir().unwrap().parent().unwrap());
-
-    command.args([
-        "run",
-        "-p",
-        "zkvm",
-        "--",
-        "--is-boot-node",
-        "--arch-nodes",
-        arch_nodes,
-        "--rpc-bind-port",
-        &port.to_string(),
-        "--bitcoin-rpc-endpoint",
-        &bitcoin_rpc_info.endpoint,
-        "--bitcoin-rpc-port",
-        &bitcoin_rpc_info.port.to_string(),
-        "--bitcoin-rpc-username",
-        &bitcoin_rpc_info.username,
-        "--bitcoin-rpc-password",
-        &bitcoin_rpc_info.password,
-    ]);
-
-    info!("Starting boot node on port {}", port);
-    command.spawn().expect("Failed to start boot node process")
-}
-
-pub fn start_node(port: u16, bitcoin_rpc_info: &BitcoinRpcInfo) -> Child {
-    env::set_var("RISC0_DEV_MODE", "1");
-
-    let mut command = Command::new("cargo");
-    command.current_dir(env::current_dir().unwrap().parent().unwrap());
-
-    command.args([
-        "run",
-        "-p",
-        "arch-node",
-        "--",
-        "--rpc-bind-port",
-        &port.to_string(),
-        "--bitcoin-rpc-endpoint",
-        &bitcoin_rpc_info.endpoint,
-        "--bitcoin-rpc-port",
-        &bitcoin_rpc_info.port.to_string(),
-        "--bitcoin-rpc-username",
-        &bitcoin_rpc_info.username,
-        "--bitcoin-rpc-password",
-        &bitcoin_rpc_info.password,
-        "--data-dir",
-        &format!(".participant{}", port),
-    ]);
-
-    info!("Starting node on port {}", port);
-    command.spawn().expect("Failed to start node process")
-}
-
-async fn stop_node(mut child: Child) {
-    match child.kill() {
-        Ok(_) => info!("Node stopped successfully"),
-        Err(e) => error!("Failed to stop node: {}", e),
-    }
-
-    let _ = child.wait();
 }
