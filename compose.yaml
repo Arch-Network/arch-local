@@ -11,18 +11,18 @@ services:
         echo "Generating validator PeerIds..."
         rm -f /bootnode_data/validator_whitelist /bootnode_data/leader_peer_id
 
-        echo "> Replicas: ${REPLICA_COUNT}"
-        LEADER_PEER_ID=$$(/validator -d /leader_data --generate-peer-id | tee -a /bootnode_data/validator_whitelist)
-        echo "> Leader PeerID: $$LEADER_PEER_ID"
-        echo "$$LEADER_PEER_ID" > /bootnode_data/leader_peer_id
+        echo "> Replicas: $${REPLICA_COUNT}"
+        LEADER_PEER_ID=$$(validator -d /leader_data --generate-peer-id | tee -a /bootnode_data/validator_whitelist)
+        echo "> Leader PeerID: $${LEADER_PEER_ID}"
+        echo "$${LEADER_PEER_ID}" > /bootnode_data/leader_peer_id
 
         echo "> Add Leader Peer ID to whitelist"
-        echo "$$LEADER_PEER_ID" >> /bootnode_data/validator_whitelist
+        echo "$${LEADER_PEER_ID}" >> /bootnode_data/validator_whitelist
 
-        for i in $(seq 1 $${REPLICA_COUNT}); do
-          echo ">> Making directory for replica $$i"
-          mkdir -p /validators_data/$$i
-          /validator -d /validators_data/$$i --generate-peer-id | tee -a /bootnode_data/validator_whitelist;
+        for i in $$(seq 1 $${REPLICA_COUNT}); do
+          echo ">> Making directory for replica $${i}"
+          mkdir -p /validators_data/$${i}
+          validator -d /validators_data/$${i} --generate-peer-id | tee -a /bootnode_data/validator_whitelist
         done
         sort -u -o /bootnode_data/validator_whitelist /bootnode_data/validator_whitelist
     volumes:
@@ -43,11 +43,11 @@ services:
           echo "Waiting for leader_peer_id file..."
           sleep 1
         done
-        WHITELIST=$(sort -u /arch_data/validator_whitelist | paste -sd "," -)
-        LEADER_PEER_ID=$(cat /arch_data/leader_peer_id)
-        echo "Validator Whitelist: $$WHITELIST"
-        echo "Leader Peer ID: $$LEADER_PEER_ID"
-        /bootnode -d /arch_data -n ${NETWORK_MODE:-localnet} --leader-peer-id "$$LEADER_PEER_ID" --validator-whitelist "$$WHITELIST"
+        WHITELIST=$$(sort -u /arch_data/validator_whitelist | paste -sd "," -)
+        LEADER_PEER_ID=$$(cat /arch_data/leader_peer_id)
+        echo "Validator Whitelist: $${WHITELIST}"
+        echo "Leader Peer ID: $${LEADER_PEER_ID}"
+        bootnode -d /arch_data -n $${NETWORK_MODE:-localnet} --leader-peer-id "$${LEADER_PEER_ID}" --validator-whitelist "$${WHITELIST}"
     depends_on:
       init:
         condition: service_completed_successfully
@@ -68,29 +68,24 @@ services:
       - -c
       - |
         set -ex
-        while [ ! -f /bootnode_data/leader_peer_id ]; do
-          echo "Waiting for leader_peer_id file..."
+        while [ ! -f /bootnode_data/peer_id ]; do
+          echo "Waiting for bootnode_peer_id file..."
           sleep 1
         done
-        LEADER_PEER_ID=$(cat /bootnode_data/leader_peer_id)
-        echo "Leader Peer ID: $$LEADER_PEER_ID"
-        # Get bootnode peer ID
-        BOOTNODE_PEER_ID=$(cat /bootnode_data/peer_id)
-        /validator -d /arch_data -n ${NETWORK_MODE:-localnet} -b "/ip4/172.19.0.250/tcp/19001/p2p/$$BOOTNODE_PEER_ID"
+        LEADER_PEER_ID=$$(cat /bootnode_data/leader_peer_id)
+        echo "Leader Peer ID: $${LEADER_PEER_ID}"
+        BOOTNODE_PEER_ID=$$(cat /bootnode_data/peer_id)
+        validator -d /arch_data -n $${NETWORK_MODE:-localnet} -b "/ip4/172.19.0.250/tcp/19001/p2p/$${BOOTNODE_PEER_ID}"
     volumes:
       - ./.arch-data/leader_arch_data:/arch_data
       - ./.arch-data/bootnode_arch_data:/bootnode_data:ro
     environment:
       - RUST_LOG=${RUST_LOG:-info,validator=debug}
       - RUSTC_LOG_COLOR=never
+      - NETWORK_MODE=${NETWORK_MODE:-localnet}
       - RPC_BIND_IP=0.0.0.0
       - RPC_BIND_PORT=9002
-      - NETWORK_MODE=${NETWORK_MODE:-localnet}
-
-      - RPC_BIND_IP=0.0.0.0 # bind to all IPs
-      - RPC_BIND_PORT=9002 # TCP 9002
       - P2P_BIND_PORT=19002
-
       - BITCOIN_RPC_ENDPOINT=bitcoin-node.dev.aws.archnetwork.xyz
       - BITCOIN_RPC_PORT=18443
       - BITCOIN_RPC_USERNAME=bitcoin
@@ -114,7 +109,6 @@ services:
       - RPC_BIND_IP=0.0.0.0 # bind to all IPs
       - RPC_BIND_PORT=9003
       - P2P_BIND_PORT=19003
-
       - BITCOIN_RPC_ENDPOINT=bitcoin-node.dev.aws.archnetwork.xyz
       - BITCOIN_RPC_PORT=18443
       - BITCOIN_RPC_USERNAME=bitcoin
@@ -138,17 +132,14 @@ services:
       - NETWORK_MODE=${NETWORK_MODE:-localnet}
       - REPLICA_ID=2
       - PRIVATE_KEY_PASSWORD="" # Provide a password if you'd like to encrypt the local node keys.
-
       - RPC_BIND_IP=0.0.0.0 # bind to all IPs
       - RPC_BIND_PORT=9004 # TCP 9004
       - P2P_BIND_PORT=19004
-
       - BITCOIN_RPC_ENDPOINT=bitcoin-node.dev.aws.archnetwork.xyz
       - BITCOIN_RPC_PORT=18443
       - BITCOIN_RPC_USERNAME=bitcoin
       - BITCOIN_RPC_PASSWORD=428bae8f3c94f8c39c50757fc89c39bc7e6ebc70ebf8f618
       - BITCOIN_RPC_WALLET=devwallet
-
     volumes:
       - ./.arch-data/validator_arch_data:/arch_data
       - ./.arch-data/bootnode_arch_data:/bootnode_data:ro
