@@ -26,4 +26,39 @@ impl LiquidityParams {
     pub fn get_liquidity_amount(&self) -> u64 {
         self.liquidity_amount
     }
+
+    pub fn get_token_details(&self) -> (u64, u64, u64) {
+        (self.token_a_amount, self.token_b_amount, self.liquidity_amount)
+    }
+}
+
+pub struct LimitOrder {
+    pub owner: Pubkey,
+    pub token_pair: (Pubkey, Pubkey),
+    pub amount: u64,
+    pub price: u64,
+    pub order_type: OrderType,
+    pub status: OrderStatus,
+}
+
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
+pub enum OrderType {
+    Buy,
+    Sell,
+}
+
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
+pub enum OrderStatus {
+    Open,
+    Executed,
+    Cancelled,
+}
+
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
+pub struct Vault {
+    pub owner: Pubkey,
+    pub token_a: Pubkey,
+    pub token_b: Pubkey,
+    pub token_a_amount: u64,
+    pub token_b_amount: u64,
 }

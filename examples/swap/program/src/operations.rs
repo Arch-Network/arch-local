@@ -3,6 +3,7 @@ use arch_program::{account::AccountInfo, program_error::ProgramError};
 use crate::calculate_swap_amount;
 pub use crate::LiquidityParams;
 pub use crate::RewardParams;
+pub use crate::vault::Vault;
 
 pub fn add_liquidity(
     liquidity_account: &AccountInfo,
@@ -177,4 +178,101 @@ pub fn claim_rewards(
     reward_data.copy_from_slice(&serialized_data);
 
     Ok(reward_amount)
+}
+
+pub fn place_limit_order(
+    order_account: &AccountInfo,
+    owner: &Pubkey,
+    token_pair: (Pubkey, Pubkey),
+    amount: u64,
+    price: u64,
+    order_type: OrderType,
+) -> Result<(), ProgramError> {
+    let mut order_data = order_account.data.borrow_mut();
+    let order = LimitOrder {
+        owner: *owner,
+        token_pair,
+        amount,
+        price,
+        order_type,
+        status: OrderStatus::Open,
+    };
+    let serialized_order = borsh::to_vec(&order).map_err(|_| ProgramError::Custom(510))?;
+    order_data[..serialized_order.len()].copy_from_slice(&serialized_order);
+    Ok(())
+}
+
+pub fn add_liquidity_to_vault(
+    vault: &mut Vault,
+    token_a_amount: u64,
+    token_b_amount: u64,
+) -> Result<(), ProgramError> {
+    vault.token_a_amount += token_a_amount;
+    vault.token_b_amount += token_b_amount;
+    Ok(())
+}
+
+pub fn remove_liquidity_from_vault(
+    vault: &mut Vault,
+    token_a_amount: u64,
+    token_b_amount: u64,
+) -> Result<(), ProgramError> {
+    if vault.token_a_amount < token_a_amount || vault.token_b_amount < token_b_amount {
+        return Err(ProgramError::Custom(507)); // Insufficient liquidity
+    }
+    vault.token_a_amount -= token_a_amount;
+    vault.token_b_amount -= token_b_amount;
+    Ok(())
+}
+
+pub fn swap_tokens_in_vault(
+    vault: &mut Vault,
+    input_amount: u64,
+    min_output_amount: u64,
+    is_token_a_to_b: bool,
+) -> Result<u64, ProgramError> {
+    let output_amount = if is_token_a_to_b {
+        calculate_swap_amount(vault.token_a_amount, vault.token_b_amount, input_amount)
+    } else {
+        calculate_swap_amount(vault.token_b_amount, vault.token_a_amount, input_amount)
+    };
+
+    if output_amount < min_output_amount {
+        return Err(ProgramError::Custom(508)); // Slippage error
+    }
+
+    if is_token_a_to_b {
+        vault.token_a_amount += input_amount;
+        vault.token_b_amount -= output_amount;
+    } else {
+        vault.token_b_amount += input_amount;
+        vault.token_a_amount -= output_amount;
+    }
+
+    Ok(output_amount)
+}
+
+pub fn contribute_liquidity(
+    liquidity_params: &mut LiquidityParams,
+    token_a_contrib: u64,
+    token_b_contrib: u64,
+) -> Result<(), ProgramError> {
+    liquidity_params.token_a_amount += token_a_contrib;
+    liquidity_params.token_b_amount += token_b_contrib;
+    liquidity_params.liquidity_amount += token_a_contrib + token_b_contrib;
+    Ok(())
+}
+
+pub fn withdraw_liquidity(
+    liquidity_params: &mut LiquidityParams,
+    token_a_withdraw: u64,
+    token_b_withdraw: u64,
+) -> Result<(), ProgramError> {
+    if liquidity_params.token_a_amount < token_a_withdraw || liquidity_params.token_b_amount < token_b_withdraw {
+        return Err(ProgramError::Custom(507)); // Insufficient liquidity
+    }
+    liquidity_params.token_a_amount -= token_a_withdraw;
+    liquidity_params.token_b_amount -= token_b_withdraw;
+    liquidity_params.liquidity_amount -= token_a_withdraw + token_b_withdraw;
+    Ok(())
 }
