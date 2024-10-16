@@ -3,6 +3,7 @@ pub mod instruction;
 pub mod operations;
 pub mod reward;
 pub mod state;
+pub mod vault_operations;
 
 pub use curve::*;
 pub use instruction::LiquidityInstruction;
