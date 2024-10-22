@@ -5,102 +5,95 @@ mod tests {
         account::AccountMeta, instruction::Instruction, pubkey::Pubkey,
         system_instruction::SystemInstruction, utxo::UtxoMeta,
     };
-    use bitcoincore_rpc::{Auth, Client};
+
+    use bip322::sign_message_bip322;
     use borsh::{BorshDeserialize, BorshSerialize};
     use common::constants::*;
     use common::helper::*;
-    use common::models::*;
-    use serial_test::serial;
+
     use std::fs;
-    use std::str::FromStr;
-    use std::thread;
-
-    use env_logger;
-    use log::{debug, error, info, warn};
-
-    fn setup() {
-        env_logger::init();
-    }
 
     /// Represents the parameters for running the Hello World process
     #[derive(Clone, BorshSerialize, BorshDeserialize)]
     pub struct HelloWorldParams {
-        name: String,
-        tx_hex: Vec<u8>,
+        pub name: String,
+        pub tx_hex: Vec<u8>,
+        pub utxo: UtxoMeta,
+    }
+
+    #[test]
+    fn test_sign_with_random_nonce() {
+        let (first_account_keypair, _first_account_pubkey) =
+            with_secret_key_file("first_account.json")
+                .expect("getting first account info should not fail");
+
+        let signature1 = sign_message_bip322(&first_account_keypair, b"helloworld");
+        let signature2 = sign_message_bip322(&first_account_keypair, b"helloworld");
+
+        println!("signature1 {:?}", signature1);
+        println!("signature2 {:?}", signature2);
+        assert_ne!(signature1, signature2);
     }
 
     #[test]
     fn test_deploy_call() {
-        setup();
+        println!("{:?}", 10044_u64.to_le_bytes());
+        println!("{:?}", 10881_u64.to_le_bytes());
 
-        let hello_name = "Satoshi"; // Name to be used in the Hello World program
-
-        info!("Starting test_deploy_call");
-        debug!(
-            "u64 10044 in little-endian bytes: {:?}",
-            10044_u64.to_le_bytes()
-        );
-        debug!(
-            "u64 10881 in little-endian bytes: {:?}",
-            10881_u64.to_le_bytes()
-        );
-
-        // 1. Create Bitcoin RPC client
-        // let rpc = Client::new(
-        //     "https://bitcoin-node.dev.aws.archnetwork.xyz:18443/wallet/testwallet",
-        //     Auth::UserPass(
-        //         "bitcoin".to_string(),
-        //         "428bae8f3c94f8c39c50757fc89c39bc7e6ebc70ebf8f618".to_string(),
-        //     ),
-        // )
-        // .expect("Failed to create Bitcoin RPC client");
-
-        // 2. Get program and caller key pairs
         let (program_keypair, program_pubkey) =
-            with_secret_key_file(PROGRAM_FILE_PATH).expect("Failed to get program key pair");
-        let (caller_keypair, caller_pubkey) =
-            with_secret_key_file(CALLER_FILE_PATH).expect("Failed to get caller key pair");
+            with_secret_key_file(PROGRAM_FILE_PATH).expect("getting caller info should not fail");
 
-        // 3. Send UTXO for program account
-        let (txid, vout) = send_utxo(program_pubkey.clone());
-        info!(
-            "UTXO sent: {}:{} for program pubkey: {:?}",
+        let (first_account_keypair, first_account_pubkey) =
+            with_secret_key_file("first_account.json")
+                .expect("getting first account info should not fail");
+
+        let (second_account_keypair, second_account_pubkey) =
+            with_secret_key_file("second_account.json")
+                .expect("getting second account info should not fail");
+
+        let (txid, vout) = send_utxo(program_pubkey);
+        println!(
+            "{}:{} {:?}",
             txid,
             vout,
-            hex::encode(program_pubkey)
+            hex::encode(program_pubkey.serialize())
         );
 
-        // 4. Create program account
-        let (txid, instruction_hash) = sign_and_send_instruction(
+        let (txid, _) = sign_and_send_instruction(
             SystemInstruction::new_create_account_instruction(
                 hex::decode(txid).unwrap().try_into().unwrap(),
                 vout,
-                program_pubkey.clone(),
+                program_pubkey,
             ),
-            vec![program_keypair.clone()],
+            vec![program_keypair],
         )
-        .expect("Failed to sign and send create account instruction");
+        .expect("signing and sending a transaction should not fail");
 
         let processed_tx = get_processed_transaction(NODE1_ADDRESS, txid.clone())
-            .expect("Failed to get processed transaction");
-        debug!(
-            "Processed transaction for account creation: {:?}",
-            processed_tx
-        );
+            .expect("get processed transaction should not fail");
+        println!("processed_tx {:?}", processed_tx);
 
-        // 5. Deploy program
-        let txids = deploy_program_txs(
-            program_keypair.clone(),
+        deploy_program_txs(
+            program_keypair,
             "program/target/sbf-solana-solana/release/helloworldprogram.so",
         );
-        info!("Program deployed with transaction IDs: {:?}", txids);
 
-        // 6. Set program as executable
-        let (txid, instruction_hash) = sign_and_send_instruction(
+        println!("{:?}", ());
+
+        let elf = fs::read("program/target/sbf-solana-solana/release/helloworldprogram.so")
+            .expect("elf path should be available");
+        assert!(
+            read_account_info(NODE1_ADDRESS, program_pubkey)
+                .unwrap()
+                .data
+                == elf
+        );
+
+        let (txid, _) = sign_and_send_instruction(
             Instruction {
                 program_id: Pubkey::system_program(),
                 accounts: vec![AccountMeta {
-                    pubkey: program_pubkey.clone(),
+                    pubkey: program_pubkey,
                     is_signer: true,
                     is_writable: true,
                 }],
@@ -108,153 +101,287 @@ mod tests {
             },
             vec![program_keypair],
         )
-        .expect("Failed to sign and send set executable instruction");
+        .expect("signing and sending a transaction should not fail");
 
         let processed_tx = get_processed_transaction(NODE1_ADDRESS, txid.clone())
-            .expect("Failed to get processed transaction");
-        debug!(
-            "Processed transaction for setting executable: {:?}",
-            processed_tx
-        );
+            .expect("get processed transaction should not fail");
+        println!("processed_tx {:?}", processed_tx);
 
-        // 7. Verify program is executable
         assert!(
-            read_account_info(NODE1_ADDRESS, program_pubkey.clone())
-                .expect("Failed to read account info")
-                .is_executable,
-            "Program should be marked as executable"
+            read_account_info(NODE1_ADDRESS, program_pubkey)
+                .unwrap()
+                .is_executable
         );
 
-        // 8. Create caller account
-        let (txid, vout) = send_utxo(caller_pubkey.clone());
-        info!(
-            "UTXO sent: {}:{} for caller pubkey: {:?}",
+        // ####################################################################################################################
+
+        let (txid, vout) = send_utxo(first_account_pubkey);
+        println!(
+            "{}:{} {:?}",
             txid,
             vout,
-            hex::encode(caller_pubkey)
+            hex::encode(first_account_pubkey.serialize())
         );
 
-        let (txid, instruction_hash) = sign_and_send_instruction(
+        let (txid, _) = sign_and_send_instruction(
             SystemInstruction::new_create_account_instruction(
                 hex::decode(txid).unwrap().try_into().unwrap(),
                 vout,
-                caller_pubkey.clone(),
+                first_account_pubkey,
             ),
-            vec![caller_keypair.clone()],
+            vec![first_account_keypair],
         )
-        .expect("Failed to sign and send create caller account instruction");
+        .expect("signing and sending a transaction should not fail");
 
         let processed_tx = get_processed_transaction(NODE1_ADDRESS, txid.clone())
-            .expect("Failed to get processed transaction");
-        debug!(
-            "Processed transaction for caller account creation: {:?}",
-            processed_tx
-        );
-
-        // 9. Assign ownership of caller account to program
+            .expect("get processed transaction should not fail");
+        println!("processed_tx {:?}", processed_tx);
 
         let mut instruction_data = vec![3];
         instruction_data.extend(program_pubkey.serialize());
 
-        let (txid, instruction_hash) = sign_and_send_instruction(
+        let (txid, _) = sign_and_send_instruction(
             Instruction {
                 program_id: Pubkey::system_program(),
                 accounts: vec![AccountMeta {
-                    pubkey: caller_pubkey.clone(),
+                    pubkey: first_account_pubkey,
                     is_signer: true,
-                    is_writable: true
+                    is_writable: true,
                 }],
-                data: instruction_data
+                data: instruction_data,
             },
-            vec![caller_keypair.clone()],
+            vec![first_account_keypair],
         )
-        .expect("Failed to sign and send Assign ownership of caller account instruction");
+        .expect("signing and sending a transaction should not fail");
 
         let processed_tx = get_processed_transaction(NODE1_ADDRESS, txid.clone())
-            .expect("Failed to get processed transaction");
-        debug!(
-            "Processed transaction for caller account ownership assignment: {:?}",
-            processed_tx
-        );
+            .expect("get processed transaction should not fail");
+        println!("processed_tx {:?}", processed_tx);
 
-        // 10. Verify that the program is owner of caller account
         assert_eq!(
-            read_account_info(NODE1_ADDRESS, caller_pubkey.clone()).unwrap().owner, 
-            program_pubkey,
-            "Program should be owner of caller account"
+            read_account_info(NODE1_ADDRESS, first_account_pubkey)
+                .unwrap()
+                .owner,
+            program_pubkey
         );
 
-        // 12. Call the program again
-        let (txid, instruction_hash) = sign_and_send_instruction(
+        // ####################################################################################################################
+
+        println!("sending THE transaction");
+
+        let (utxo_txid, utxo_vout) = send_utxo(second_account_pubkey);
+        println!(
+            "{}:{} {:?}",
+            utxo_txid,
+            utxo_vout,
+            hex::encode(second_account_pubkey.serialize())
+        );
+
+        let (txid, _) = sign_and_send_instruction(
             Instruction {
-                program_id: program_pubkey.clone(),
-                accounts: vec![AccountMeta {
-                    pubkey: caller_pubkey.clone(),
-                    is_signer: true,
-                    is_writable: true
-                }],
+                program_id: program_pubkey,
+                accounts: vec![
+                    AccountMeta {
+                        pubkey: first_account_pubkey,
+                        is_signer: true,
+                        is_writable: true,
+                    },
+                    AccountMeta {
+                        pubkey: second_account_pubkey,
+                        is_signer: true,
+                        is_writable: true,
+                    },
+                ],
                 data: borsh::to_vec(&HelloWorldParams {
-                    name: hello_name.to_string(),
-                    tx_hex: hex::decode(prepare_fees()).unwrap()
-                }).unwrap()
+                    name: "arch".to_string(),
+                    tx_hex: hex::decode(prepare_fees()).unwrap(),
+                    utxo: UtxoMeta::from(
+                        hex::decode(utxo_txid.clone()).unwrap().try_into().unwrap(),
+                        utxo_vout,
+                    ),
+                })
+                .unwrap(),
             },
-            vec![caller_keypair],
+            vec![first_account_keypair, second_account_keypair],
         )
-        .expect("Failed to sign and send program call instruction");
+        .expect("signing and sending a transaction should not fail");
 
         let processed_tx = get_processed_transaction(NODE1_ADDRESS, txid.clone())
-            .expect("Failed to get processed transaction");
-        debug!("Processed transaction for program call: {:?}", processed_tx);
+            .expect("get processed transaction should not fail");
+        println!("processed_tx {:?}", processed_tx);
 
-        // 10. Check results
-        let caller_account_info = read_account_info(NODE1_ADDRESS, caller_pubkey.clone())
-            .expect("Failed to read caller account info");
-        info!(
-            "Caller account info after program call: {:?}",
-            caller_account_info
-        );
+        let first_account_last_state =
+            read_account_info(NODE1_ADDRESS, first_account_pubkey).unwrap();
+        println!("{:?}", first_account_last_state);
         assert_eq!(
-            caller_account_info.utxo, 
-            format!("{}:{}", processed_tx.bitcoin_txids[0], 0),
-            "Caller account utxo doesn't match bitcoin txid"
+            first_account_last_state.utxo,
+            format!("{}:{}", processed_tx.bitcoin_txid.unwrap(), 0)
         );
 
-        // 11. Call the program
-        let (txid, instruction_hash) = sign_and_send_instruction(
+        let second_account_last_state =
+            read_account_info(NODE1_ADDRESS, second_account_pubkey).unwrap();
+        println!("{:?}", second_account_last_state);
+        assert_eq!(
+            second_account_last_state.utxo,
+            format!("{}:{}", utxo_txid, utxo_vout)
+        );
+
+        // ####################################################################################################################
+
+        println!("sending THE transaction");
+
+        let (utxo_txid, utxo_vout) = send_utxo(second_account_pubkey);
+        println!(
+            "{}:{} {:?}",
+            utxo_txid,
+            utxo_vout,
+            hex::encode(second_account_pubkey.serialize())
+        );
+
+        let (txid, _) = sign_and_send_instruction(
             Instruction {
-                program_id: program_pubkey.clone(),
-                accounts: vec![AccountMeta {
-                    pubkey: caller_pubkey.clone(),
-                    is_signer: true,
-                    is_writable: true
-                }],
+                program_id: program_pubkey,
+                accounts: vec![
+                    AccountMeta {
+                        pubkey: first_account_pubkey,
+                        is_signer: true,
+                        is_writable: true,
+                    },
+                    AccountMeta {
+                        pubkey: second_account_pubkey,
+                        is_signer: true,
+                        is_writable: true,
+                    },
+                ],
                 data: borsh::to_vec(&HelloWorldParams {
-                    name: hello_name.to_string(),
-                    tx_hex: hex::decode(prepare_fees()).unwrap()
-                }).unwrap()
+                    name: "arch".to_string(),
+                    tx_hex: hex::decode(prepare_fees()).unwrap(),
+                    utxo: UtxoMeta::from(
+                        hex::decode(utxo_txid.clone()).unwrap().try_into().unwrap(),
+                        utxo_vout,
+                    ),
+                })
+                .unwrap(),
             },
-            vec![caller_keypair],
+            vec![first_account_keypair, second_account_keypair],
         )
-        .expect("Failed to sign and send program call instruction");
+        .expect("signing and sending a transaction should not fail");
 
         let processed_tx = get_processed_transaction(NODE1_ADDRESS, txid.clone())
-            .expect("Failed to get processed transaction");
-        debug!("Processed transaction for program call: {:?}", processed_tx);
+            .expect("get processed transaction should not fail");
+        println!("processed_tx {:?}", processed_tx);
 
-        // 10. Check results
-        let caller_account_info = read_account_info(NODE1_ADDRESS, caller_pubkey.clone())
-            .expect("Failed to read caller account info");
-        info!(
-            "Caller account info after program call: {:?}",
-            caller_account_info
+        println!(
+            "{:?}",
+            read_account_info(NODE1_ADDRESS, first_account_pubkey)
         );
         assert_eq!(
-            caller_account_info.utxo, 
-            format!("{}:{}", processed_tx.bitcoin_txids[0], 0),
-            "Caller account utxo doesn't match bitcoin txid"
+            read_account_info(NODE1_ADDRESS, first_account_pubkey)
+                .unwrap()
+                .owner,
+            first_account_last_state.owner
+        );
+        assert_eq!(
+            read_account_info(NODE1_ADDRESS, first_account_pubkey)
+                .unwrap()
+                .data,
+            first_account_last_state.data
+        );
+        assert_eq!(
+            read_account_info(NODE1_ADDRESS, first_account_pubkey)
+                .unwrap()
+                .utxo,
+            first_account_last_state.utxo
+        );
+        assert_eq!(
+            read_account_info(NODE1_ADDRESS, first_account_pubkey)
+                .unwrap()
+                .is_executable,
+            first_account_last_state.is_executable
         );
 
-        info!("test_deploy_call completed successfully");
+        println!(
+            "{:?}",
+            read_account_info(NODE1_ADDRESS, second_account_pubkey)
+        );
+        assert_eq!(
+            read_account_info(NODE1_ADDRESS, second_account_pubkey)
+                .unwrap()
+                .owner,
+            second_account_last_state.owner
+        );
+        assert_eq!(
+            read_account_info(NODE1_ADDRESS, second_account_pubkey)
+                .unwrap()
+                .data,
+            second_account_last_state.data
+        );
+        assert_eq!(
+            read_account_info(NODE1_ADDRESS, second_account_pubkey)
+                .unwrap()
+                .owner,
+            second_account_last_state.owner
+        );
+        assert_eq!(
+            read_account_info(NODE1_ADDRESS, second_account_pubkey)
+                .unwrap()
+                .is_executable,
+            second_account_last_state.is_executable
+        );
+
+        // let (utxo_txid, utxo_vout) = send_utxo_2(second_account_pubkey);
+        // println!(
+        //     "{}:{} {:?}",
+        //     utxo_txid,
+        //     utxo_vout,
+        //     hex::encode(second_account_pubkey.serialize())
+        // );
+
+        // let (txid, _) = sign_and_send_instruction(
+        //     Instruction {
+        //         program_id: program_pubkey,
+        //         accounts: vec![
+        //             AccountMeta {
+        //                 pubkey: first_account_pubkey,
+        //                 is_signer: true,
+        //                 is_writable: true,
+        //             },
+        //             AccountMeta {
+        //                 pubkey: second_account_pubkey,
+        //                 is_signer: true,
+        //                 is_writable: true,
+        //             },
+        //         ],
+        //         data: borsh::to_vec(&HelloWorldParams {
+        //             name: "arch".to_string(),
+        //             tx_hex: hex::decode(prepare_fees()).unwrap(),
+        //             utxo: UtxoMeta::from_outpoint(utxo_txid, utxo_vout)
+        //         })
+        //         .unwrap(),
+        //     },
+        //     vec![first_account_keypair, second_account_keypair],
+        // )
+        // .expect("signing and sending a transaction should not fail");
+
+        // let processed_tx = get_processed_transaction(NODE1_ADDRESS, txid.clone())
+        //     .expect("get processed transaction should not fail");
+        // println!("processed_tx {:?}", processed_tx);
+
+        // println!("{:?}", read_account_info(NODE1_ADDRESS, first_account_pubkey));
+        // assert_eq!(
+        //     read_account_info(NODE1_ADDRESS, first_account_pubkey)
+        //         .unwrap()
+        //         .utxo,
+        //     format!("{}:{}", processed_tx.bitcoin_txids[0], 0)
+        // );
+
+        // println!("{:?}", read_account_info(NODE1_ADDRESS, second_account_pubkey));
+        // assert_ne!(
+        //     read_account_info(NODE1_ADDRESS, second_account_pubkey)
+        //         .unwrap()
+        //         .utxo,
+        //     format!("{}:{}", utxo_txid.to_string(), utxo_vout)
+        // );
     }
 
     // #[test]

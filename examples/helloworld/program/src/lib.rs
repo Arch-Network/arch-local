@@ -1,41 +1,51 @@
 use arch_program::{
     account::AccountInfo,
-    entrypoint,
-    helper::get_state_transition_tx,
+    entrypoint, msg,
+    helper::add_state_transition,
     input_to_sign::InputToSign,
-    instruction::Instruction,
-    msg,
     program::{
-        get_account_script_pubkey, get_bitcoin_tx, get_network_xonly_pubkey, invoke,
-        next_account_info, set_return_data, set_transaction_to_sign, validate_utxo_ownership,
+        get_account_script_pubkey, get_bitcoin_block_height,
+        next_account_info, set_transaction_to_sign, invoke
     },
     program_error::ProgramError,
-    pubkey::Pubkey,
-    system_instruction::SystemInstruction,
+    pubkey::Pubkey, utxo::UtxoMeta, 
     transaction_to_sign::TransactionToSign,
-    utxo::UtxoMeta,
+    system_instruction::SystemInstruction,
+    bitcoin::{self, Transaction, transaction::Version, absolute::LockTime}
 };
-use bitcoin::{self, Transaction};
 use borsh::{BorshDeserialize, BorshSerialize};
 
 entrypoint!(process_instruction);
 pub fn process_instruction(
-    program_id: &Pubkey,
+    _program_id: &Pubkey,
     accounts: &[AccountInfo],
     instruction_data: &[u8],
 ) -> Result<(), ProgramError> {
-    if accounts.len() != 1 {
+    if accounts.len() != 2 {
         return Err(ProgramError::Custom(501));
     }
 
+    let bitcoin_block_height = get_bitcoin_block_height();
+    msg!("bitcoin_block_height {:?}", bitcoin_block_height);
+
     let account_iter = &mut accounts.iter();
     let account = next_account_info(account_iter)?;
+    let account2 = next_account_info(account_iter)?;
+
+    msg!("account {:?}", account);
+    msg!("account2 {:?}", account2);
+
+    if account2.utxo.clone() != UtxoMeta::from_slice(&[0; 36]) {
+        msg!("UTXO {:?}", account2.utxo.clone());
+        return Err(ProgramError::Custom(502));
+    }
 
     let params: HelloWorldParams = borsh::from_slice(instruction_data).unwrap();
     let fees_tx: Transaction = bitcoin::consensus::deserialize(&params.tx_hex).unwrap();
 
     let new_data = format!("Hello {}", params.name);
 
+    // Extend the account data to fit the new data
     let data_len = account.data.try_borrow().unwrap().len();
     if new_data.as_bytes().len() > data_len {
         account.realloc(new_data.len(), true)?;
@@ -50,7 +60,24 @@ pub fn process_instruction(
         .unwrap()
         .copy_from_slice(new_data.as_bytes());
 
-    let mut tx = get_state_transition_tx(accounts);
+    if account2.is_writable {
+
+        invoke(
+            &SystemInstruction::new_create_account_instruction(
+                params.utxo.txid().try_into().unwrap(), 
+                params.utxo.vout(), account2.key.clone()
+            ), 
+            &[account2.clone()]
+        ).expect("failed");
+    }
+
+    let mut tx = Transaction {
+        version: Version::TWO,
+        lock_time: LockTime::ZERO,
+        input: vec![],
+        output: vec![],
+    };
+    add_state_transition(&mut tx, account);
     tx.input.push(fees_tx.input[0].clone());
 
     let tx_to_sign = TransactionToSign {
@@ -63,13 +90,12 @@ pub fn process_instruction(
 
     msg!("tx_to_sign{:?}", tx_to_sign);
 
-    set_transaction_to_sign(accounts, tx_to_sign);
-
-    Ok(())
+    set_transaction_to_sign(accounts, tx_to_sign)
 }
 
 #[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
 pub struct HelloWorldParams {
     pub name: String,
     pub tx_hex: Vec<u8>,
+    pub utxo: UtxoMeta,
 }

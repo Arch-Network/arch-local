@@ -1,22 +1,33 @@
 [package]
-name = "helloworld"
+name = "ebpf-counter"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
 common = { path = "../common" }
 arch_program = { path = "../../program" }
+sdk = { path = "../../sdk" }
 bip322 = { path = "../../bip322" }
 
-bitcoincore-rpc = "0.18.0"
+bitcoincore-rpc = "0.19.0"
 hex = "0.4.3"
 borsh = { version = "1.4.0", features = ["derive"] }
 bitcoin = { version = "0.32.3", features = ["serde", "rand"] }
 log = "0.4"
 env_logger = "0.10"
+tracing.workspace = true
+tracing-subscriber = { version = "0.3.3", features = ["env-filter","ansi"] }
+clap = { version = "4.0", features = ["derive"] }
+rand_core = "0.6.4"
+anyhow = "1.0.82"
+serde_json = "1.0.128"
+indicatif = "0.17.8"
+
 
 [dev-dependencies]
 serial_test = "3.1.1"
 
 [lib]
 path = "src/lib.rs"
+
+

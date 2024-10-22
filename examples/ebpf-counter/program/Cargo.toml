@@ -1,10 +1,7 @@
-[workspace]
 [package]
-name = "helloworldprogram"
+name = "counter_program"
 version = "0.1.0"
 edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 arch_program = { path = "../../../program" }
@@ -12,3 +9,5 @@ borsh = { version = "1.5.1", features = ["derive"] }
 
 [lib]
 crate-type = ["cdylib", "lib"]
+
+[workspace]

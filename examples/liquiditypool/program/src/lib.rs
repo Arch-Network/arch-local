@@ -1,22 +1,23 @@
 use arch_program::{
-    account::{AccountInfo},
+    account::AccountInfo,
     entrypoint,
+    helper::get_state_transition_tx,
+    input_to_sign::InputToSign,
     instruction::Instruction,
     msg,
     program::{
-        invoke, set_return_data, get_bitcoin_tx, 
-        validate_utxo_ownership, get_network_xonly_pubkey,
-        set_transaction_to_sign, next_account_info,
+        get_bitcoin_tx, get_network_xonly_pubkey, invoke, next_account_info, set_return_data,
+        set_transaction_to_sign, validate_utxo_ownership,
     },
     helper::get_state_transition_tx,
     transaction_to_sign::TransactionToSign,
     program_error::ProgramError,
-    input_to_sign::InputToSign,
     pubkey::Pubkey,
-    utxo::UtxoMeta,
     system_instruction::SystemInstruction,
+    transaction_to_sign::TransactionToSign,
+    utxo::UtxoMeta,
 };
-use borsh::{BorshSerialize, BorshDeserialize};
+use borsh::{BorshDeserialize, BorshSerialize};
 
 entrypoint!(process_instruction);
 pub fn process_instruction(
@@ -24,7 +25,6 @@ pub fn process_instruction(
     accounts: &[AccountInfo],
     instruction_data: &[u8],
 ) -> Result<(), ProgramError> {
-    
     let params: LiquidityPoolParams = borsh::from_slice(instruction_data).unwrap();
 
     match params {
@@ -32,18 +32,25 @@ pub fn process_instruction(
             open_pool_params,
             user_psbt,
             param_utxos,
-            serialized_utxos
+            serialized_utxos,
         )) => {
-            let utxos = serialized_utxos.iter().map(|serialized_utxo| UtxoMeta::from_slice(serialized_utxo)).collect::<Vec<UtxoMeta>>();
+            let utxos = serialized_utxos
+                .iter()
+                .map(|serialized_utxo| UtxoMeta::from_slice(serialized_utxo))
+                .collect::<Vec<UtxoMeta>>();
 
             if accounts.len() != 2 {
                 panic!("account length mismatch");
             }
-        
+
             let account_iter = &mut accounts.iter();
             let liquidity_pool_account = next_account_info(account_iter)?;
-            assert!(liquidity_pool_account.is_writable, "liquidity_pool_account must be writable");
-            let mut pool: LiquidityPool = borsh::from_slice(&liquidity_pool_account.data.try_borrow().unwrap()).unwrap();
+            assert!(
+                liquidity_pool_account.is_writable,
+                "liquidity_pool_account must be writable"
+            );
+            let mut pool: LiquidityPool =
+                borsh::from_slice(&liquidity_pool_account.data.try_borrow().unwrap()).unwrap();
             let caller_account = next_account_info(account_iter)?;
             assert!(caller_account.is_signer, "caller_account must be signer");
 
@@ -56,9 +63,12 @@ pub fn process_instruction(
                 &utxos,
             );
 
-            liquidity_pool_account.data.try_borrow_mut().unwrap().copy_from_slice(&borsh::to_vec(&pool).unwrap());
-            
-        },
+            liquidity_pool_account
+                .data
+                .try_borrow_mut()
+                .unwrap()
+                .copy_from_slice(&borsh::to_vec(&pool).unwrap());
+        }
         _ => {}
     }
 
@@ -73,7 +83,6 @@ pub fn initialize_pool(
     param_utxos: OpenPoolUtxos,
     utxos: &Vec<UtxoMeta>,
 ) {
-    
 }
 
 #[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]

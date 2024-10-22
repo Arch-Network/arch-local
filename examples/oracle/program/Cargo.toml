@@ -1,6 +1,6 @@
 [workspace]
 [package]
-name = "helloworldprogram"
+name = "oracleprogram"
 version = "0.1.0"
 edition = "2021"
 
@@ -11,4 +11,4 @@ arch_program = { path = "../../../program" }
 borsh = { version = "1.5.1", features = ["derive"] }
 
 [lib]
-crate-type = ["cdylib", "lib"]
+crate-type = ["cdylib", "lib"] 

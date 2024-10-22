@@ -5,9 +5,10 @@ edition = "2021"
 
 [dependencies]
 sdk = { path = "../../sdk" }
+bip322 = { path = "../../bip322" }
 
-bitcoincore-rpc = "0.18.0"
-bitcoin = { version = "0.31.0", features = ["serde", "rand"] }
+bitcoincore-rpc = "0.19.0"
+bitcoin = { version = "0.32.3", features = ["serde", "rand"] }
 rand_core = { version = "0.6.4", features = ["getrandom"] }
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "blocking"] }
 serde_json = "1.0.116"
@@ -15,8 +16,9 @@ serde = { version = "1.0.198", features = ["derive"] }
 sha256 = "1.5.0"
 anyhow = "1.0.82"
 hex = "0.4.3"
-log = "0.4"
-env_logger = "0.10"
+indicatif = "0.17.8"
+snafu = "0.8.5"
+base64 = "0.22.1"
 
 [dev-dependencies]
 serial_test = "3.1.1"
