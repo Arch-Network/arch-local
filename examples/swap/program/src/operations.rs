@@ -8,25 +8,18 @@ pub use crate::vault::Vault;
 pub fn add_liquidity(
     liquidity_account: &AccountInfo,
     liquidity_params: &mut LiquidityParams,
-    token_a: Pubkey,
-    token_b: Pubkey,
     token_a_amount: u64,
     token_b_amount: u64,
 ) -> Result<(), ProgramError> {
-    // Ensure the tokens match those in the liquidity_params
-    if liquidity_params.token_a != token_a || liquidity_params.token_b != token_b {
-        return Err(ProgramError::Custom(506)); // Token mismatch error
-    }
-    liquidity_params.token_a_amount += token_a_amount;
-    // Existing logic to add liquidity
+    //  Update liquidity parameters directly
     liquidity_params.token_a_amount += token_a_amount;
     liquidity_params.token_b_amount += token_b_amount;
     liquidity_params.liquidity_amount = liquidity_params.token_a_amount + liquidity_params.token_b_amount;
-        liquidity_params.token_a_amount + liquidity_params.token_b_amount;
-    // Serialize and save
+
+    // Serialize and save updated state
     let serialized_data = borsh::to_vec(&*liquidity_params).map_err(|_| ProgramError::Custom(503))?;
     liquidity_account.data.borrow_mut().copy_from_slice(&serialized_data);
-        borsh::to_vec(&*liquidity_params).map_err(|_| ProgramError::Custom(503))?;
+
     Ok(())
 }
 
@@ -36,7 +29,11 @@ pub fn remove_liquidity(
     liquidity_params: &mut LiquidityParams,
     token_a_amount: u64,
     token_b_amount: u64,
+    current_time: u64,
 ) -> Result<(), ProgramError> {
+    // Calculate yield before removing liquidity
+    update_yield(liquidity_params, current_time)?;
+
     let mut liquidity_data = liquidity_account
         .data
         .try_borrow_mut()
@@ -275,4 +272,55 @@ pub fn withdraw_liquidity(
     liquidity_params.token_b_amount -= token_b_withdraw;
     liquidity_params.liquidity_amount -= token_a_withdraw + token_b_withdraw;
     Ok(())
+}
+
+// Function to execute matching limit orders
+pub fn execute_limit_orders(
+    orders: &mut [LimitOrder],
+    current_market_prices: &[(Pubkey, Pubkey, u64)],
+) -> Result<(), ProgramError> {
+    for order in orders.iter_mut() {
+        if let Some(price) = current_market_prices.iter().find(|(token_a, token_b, _)| *token_a == order.token_pair.0 && *token_b == order.token_pair.1).map(|(_, _, price)| *price) {
+            if (order.order_type == OrderType::Buy && price <= order.price) || (order.order_type == OrderType::Sell && price >= order.price) {
+                order.status = OrderStatus::Executed;
+            }
+        }
+    }
+    Ok(())
+}
+
+pub fn update_yield(liquidity_params: &mut LiquidityParams, current_time: u64) -> Result<(), ProgramError> {
+    let time_elapsed = current_time - liquidity_params.last_yield_update_time;
+    let yield_rate = 0.05; //  yield rate: 5% per year
+
+    //  yield calculation: yield = principal * rate * time
+    let additional_yield = (liquidity_params.liquidity_amount as f64 * yield_rate * (time_elapsed as f64 / 31536000.0)) as u64; // 31536000 = seconds in a year
+
+    liquidity_params.yield_accumulated += additional_yield;
+    liquidity_params.last_yield_update_time = current_time;
+
+    Ok(())
+}
+
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
+pub struct LimitOrder {
+    pub owner: Pubkey,
+    pub token_pair: (Pubkey, Pubkey),
+    pub amount: u64,
+    pub price: u64,
+    pub order_type: OrderType,
+    pub status: OrderStatus,
+}
+
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
+pub enum OrderType {
+    Buy,
+    Sell,
+}
+
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
+pub enum OrderStatus {
+    Open,
+    Executed,
+    Cancelled,
 }

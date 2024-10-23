@@ -4,9 +4,9 @@ use borsh::{BorshDeserialize, BorshSerialize};
 
 #[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
 pub struct RewardParams {
-    pub total_staked: u64,  // Total amount of tokens staked in the system
-    pub total_rewards: u64, // Total rewards distributed
-    pub reward_rate: f64,   // Reward rate per staked token (dynamic)
+    pub total_staked: u64,  
+    pub total_rewards: u64, 
+    pub reward_rate: f64,   
 }
 
 impl RewardParams {
@@ -21,11 +21,10 @@ impl RewardParams {
 
     // Update reward parameters based on total staked tokens
     pub fn update_reward_rate(&mut self) {
-        // Example formula: reward rate decreases as total staked increases
+        
         let total_staked_f64 = self.total_staked as f64;
 
-        // Example formula: reward rate decreases as total staked increases
-        // Ensure that the formula is valid for floating-point arithmetic
+        
         let adjusted_staked = total_staked_f64 / 10.0 + 1.0;
         self.reward_rate = 5.0 * self.reward_rate / adjusted_staked;
     }
@@ -38,5 +37,11 @@ impl RewardParams {
     // Add rewards to the total rewards
     pub fn add_rewards(&mut self, amount: f64) {
         self.total_rewards = (self.total_rewards as f64 + amount).round() as u64;
+    }
+
+    // Method to distribute trading fees as yields
+    pub fn distribute_yield(&mut self, trading_fee: u64) {
+        let yield_to_distribute = (trading_fee as f64 * 0.8) as u64; // 80% of trading fees go to yield
+        self.total_rewards += yield_to_distribute;
     }
 }

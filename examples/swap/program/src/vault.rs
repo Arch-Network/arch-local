@@ -1,5 +1,5 @@
 use borsh::{BorshDeserialize, BorshSerialize};
-use solana_program::pubkey::Pubkey;
+use arch_program::pubkey::Pubkey;
 
 #[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
 pub struct Vault {
@@ -20,5 +20,7 @@ impl Vault {
             token_b_amount: 0,
         }
     }
+
 }
+
 
