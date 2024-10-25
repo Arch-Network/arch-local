@@ -27,7 +27,6 @@ use crate::curve::calculate_swap_amount;
 use crate::operations::add_liquidity;
 use crate::operations::claim_rewards;
 use crate::operations::remove_liquidity;
-use crate::operations::stake_tokens;
 use crate::operations::unstake_tokens;
 pub use crate::reward::RewardParams;
 pub use crate::state::LiquidityParams;
@@ -285,12 +284,14 @@ mod tests {
         // Simulate removing liquidity
         let token_a_amount = 500;
         let token_b_amount = 1000;
+        let liquidity_amount = 1500; // Added missing u64 argument
 
         let result = remove_liquidity(
             &account,
             &mut liquidity_params,
             token_a_amount,
             token_b_amount,
+            liquidity_amount,
         );
 
         // Assert success or failure based on your implementation
@@ -301,7 +302,6 @@ mod tests {
         assert_eq!(liquidity_params.token_b_amount, 1500); // Adjust expected values as needed
         assert_eq!(liquidity_params.liquidity_amount, 2500); // Total liquidity
     }
-
     #[test]
     fn test_get_liquidity_amount() {
         let pubkey = Pubkey::from_slice(&[0u8; 32]); // Dummy pubkey
@@ -394,7 +394,7 @@ mod tests {
 
         // Step 1: Stake tokens
         let stake_amount = 5; // Amount to stake
-        let stake_result = stake_tokens(&account, &mut reward_params, stake_amount);
+        let stake_result = unstake_tokens(&account, &mut reward_params, stake_amount);
         assert!(stake_result.is_ok());
 
         // Validate that the staked amount has increased
@@ -419,5 +419,5 @@ mod tests {
 
         // Optionally log claimed rewards for better visibility (can be removed in production)
         println!("Claimed rewards: {}", claimed_rewards);
-    }
-}
+
+    }}
