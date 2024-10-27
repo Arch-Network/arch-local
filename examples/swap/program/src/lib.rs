@@ -6,6 +6,7 @@ pub mod state;
 pub mod vault_operations;
 pub mod trading_routes;
 pub mod limit_order;
+pub mod dca;
 use trading_routes::TradingRoute;
 use limit_order::LimitOrderBook;
 
