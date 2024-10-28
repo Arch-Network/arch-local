@@ -201,7 +201,7 @@ rustflags = [
 - [Solana Cli]
 - [Solana Local Development Guide]
 
-
+[arch-cli]: https://github.com/arch-network/arch-cli
 [gcc]: https://gcc.gnu.org/
 [docs]: https://docs.arch.network
 [Rust]: https://www.rust-lang.org/
