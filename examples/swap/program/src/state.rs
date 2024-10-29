@@ -17,8 +17,8 @@ impl LiquidityParams {
     pub fn new(initial_token_a: u64, initial_token_b: u64) -> Self {
         LiquidityParams {
             liquidity_amount: initial_token_a + initial_token_b, 
-            token_a: Pubkey::new_unique(),                     
-            token_b: Pubkey::new_unique(),                     
+            token_a: Pubkey::from_slice(&[0; 32]),                     
+            token_b: Pubkey::from_slice(&[1; 32]),                     
             token_a_amount: initial_token_a,
             token_b_amount: initial_token_b,
             yield_accumulated: 0,
